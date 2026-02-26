@@ -1,28 +1,35 @@
 import streamlit as st
 import cv2
 import numpy as np
+import tensorflow as tf
 from tensorflow.keras.models import load_model
 from PIL import Image
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
+from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
 
-# UI Configuration
+# Memory optimization for OpenCV
+cv2.setNumThreads(0)
+
 st.set_page_config(page_title="Emotion AI - Pritam Kumar", layout="centered")
 st.title("🎭 Real-Time Emotion Recognition")
-st.subheader("Deep Learning based Facial Expression Analysis")
 
-# Load model and cascade
+# Model load karte waqt memory crash se bachne ke liye compile=False
 @st.cache_resource
 def setup_resources():
-    # compile=False helps avoid training-related errors on cloud
-    model = load_model("emotion_detection.h5", compile=False)
-    cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
-    return model, cascade
+    try:
+        model = load_model("emotion_detection.h5", compile=False)
+        cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
+        return model, cascade
+    except Exception as e:
+        st.error(f"Error: {e}")
+        return None, None
 
 model, face_cascade = setup_resources()
 emotion_labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
 
-# Core logic for processing each frame
-def process_frame(frame):
+def process_emotion(frame):
+    if model is None or face_cascade is None:
+        return frame
+        
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
     
@@ -31,6 +38,7 @@ def process_frame(frame):
         roi = cv2.resize(fc, (48, 48)) / 255.0
         roi = np.reshape(roi, (1, 48, 48, 1))
         
+        # Prediction logic
         prediction = model.predict(roi, verbose=0)
         label = emotion_labels[np.argmax(prediction)]
         
@@ -38,36 +46,32 @@ def process_frame(frame):
         cv2.putText(frame, label, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
     return frame
 
-# WebRTC Transformer class for LIVE Camera
-class EmotionTransformer(VideoTransformerBase):
-    def transform(self, frame):
-        # Convert frame to numpy array
+class EmotionProcessor(VideoProcessorBase):
+    def recv(self, frame):
         img = frame.to_ndarray(format="bgr24")
-        processed_img = process_frame(img)
-        return processed_img
+        processed_img = process_emotion(img)
+        return av.VideoFrame.from_ndarray(processed_img, format="bgr24")
 
-# Sidebar Options
+# UI Logic
 option = st.sidebar.radio("Navigation", ["Home", "Live Webcam", "Upload Image"])
 
 if option == "Home":
-    st.write("### Welcome Pritam!")
-    st.write("Go to 'Live Webcam' to test real-time detection.")
+    st.write("### Welcome Pritam! System optimized for Python 3.13.")
 
 elif option == "Live Webcam":
+    import av # Video frame processing library
     st.write("### 🎥 Live Stream")
-    st.info("Allow camera access in your browser to start.")
-    # This is the MAGIC part that works on Cloud
     webrtc_streamer(
-        key="emotion-detection", 
-        video_transformer_factory=EmotionTransformer,
-        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+        key="emotion-detect",
+        video_processor_factory=EmotionProcessor,
+        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+        media_stream_constraints={"video": True, "audio": False},
     )
 
 elif option == "Upload Image":
-    file = st.file_uploader("Upload a face photo", type=['jpg', 'png', 'jpeg'])
+    file = st.file_uploader("Upload a photo", type=['jpg', 'png', 'jpeg'])
     if file:
         img = Image.open(file)
         img_array = np.array(img.convert('RGB'))
-        # Convert to BGR for processing and back to RGB for display
-        processed = process_frame(cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR))
-        st.image(cv2.cvtColor(processed, cv2.COLOR_BGR2RGB), caption="Analysis Result")
+        processed = process_emotion(cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR))
+        st.image(cv2.cvtColor(processed, cv2.COLOR_BGR2RGB))
