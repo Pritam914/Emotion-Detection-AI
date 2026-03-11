@@ -7,30 +7,26 @@ from streamlit_webrtc import webrtc_streamer, WebRtcMode
 import av
 import os
 
-# Set environment variables
+# CPU aur Protocol Buffer optimization
 os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
 cv2.setNumThreads(0)
-
-# --- THE ULTIMATE PATCH ---
-@keras.saving.register_keras_serializable(package="Custom")
-class PatchedDense(keras.layers.Dense):
-    def __init__(self, **kwargs):
-        kwargs.pop('quantization_config', None)
-        super().__init__(**kwargs)
 
 st.set_page_config(page_title="Emotion AI - Pritam Kumar")
 st.title("🎭 Real-Time Emotion Recognition")
 
+# Model load karne ka sabse stable tareeka
 @st.cache_resource
 def load_all():
-    # FIX: Corrected the try-except block structure
     try:
-        from keras.src.saving import serialization_lib
-        serialization_lib.add_rewrite_data("Dense", PatchedDense)
-        
+        # Keras 3 ke liye simple loading with custom object
+        # Hum Dense layer ko load hote waqt sanitize karenge
+        def patched_dense(**kwargs):
+            kwargs.pop('quantization_config', None)
+            return keras.layers.Dense(**kwargs)
+
         model = keras.models.load_model(
             "emotion_model.keras", 
-            custom_objects={"Dense": PatchedDense}, 
+            custom_objects={"Dense": patched_dense}, 
             compile=False, 
             safe_mode=False
         )
@@ -45,8 +41,7 @@ labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
 
 def callback(frame):
     img = frame.to_ndarray(format="bgr24")
-    if model is None or face_cascade is None: 
-        return av.VideoFrame.from_ndarray(img, format="bgr24")
+    if model is None: return av.VideoFrame.from_ndarray(img, format="bgr24")
     
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
@@ -65,7 +60,7 @@ def callback(frame):
         
     return av.VideoFrame.from_ndarray(img, format="bgr24")
 
-# UI Settings
+# UI Settings - Direct Webcam
 webrtc_streamer(
     key="emotion",
     mode=WebRtcMode.SENDRECV,
