@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import tensorflow as tf
 import keras
-from streamlit_webrtc import webrtc_streamer, WebRtcMode
+from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration
 import av
 import os
 
@@ -14,12 +14,20 @@ cv2.setNumThreads(0)
 st.set_page_config(page_title="Emotion AI - Pritam Kumar")
 st.title("🎭 Real-Time Emotion Recognition")
 
-# Model load karne ka sabse stable tareeka
+# RTC Configuration with Multiple STUN Servers for better connectivity
+# 
+RTC_CONFIGURATION = RTCConfiguration(
+    {"iceServers": [
+        {"urls": ["stun:stun.l.google.com:19302"]},
+        {"urls": ["stun:stun1.l.google.com:19302"]},
+        {"urls": ["stun:stun2.l.google.com:19302"]},
+        {"urls": ["stun:stun3.l.google.com:19302"]}
+    ]}
+)
+
 @st.cache_resource
 def load_all():
     try:
-        # Keras 3 ke liye simple loading with custom object
-        # Hum Dense layer ko load hote waqt sanitize karenge
         def patched_dense(**kwargs):
             kwargs.pop('quantization_config', None)
             return keras.layers.Dense(**kwargs)
@@ -41,7 +49,8 @@ labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
 
 def callback(frame):
     img = frame.to_ndarray(format="bgr24")
-    if model is None: return av.VideoFrame.from_ndarray(img, format="bgr24")
+    if model is None or face_cascade is None: 
+        return av.VideoFrame.from_ndarray(img, format="bgr24")
     
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
@@ -60,12 +69,18 @@ def callback(frame):
         
     return av.VideoFrame.from_ndarray(img, format="bgr24")
 
-# UI Settings - Direct Webcam
+# UI Logic
+st.sidebar.info("Select your camera from the dropdown and click 'Start'")
+
 webrtc_streamer(
-    key="emotion",
+    key="emotion-ai",
     mode=WebRtcMode.SENDRECV,
+    rtc_configuration=RTC_CONFIGURATION,
     video_frame_callback=callback,
-    rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
-    media_stream_constraints={"video": True, "audio": False},
-    async_processing=True
+    media_stream_constraints={
+        "video": True,
+        "audio": False
+    },
+    async_processing=True,
+    # 
 )
