@@ -12,42 +12,41 @@ os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
 cv2.setNumThreads(0)
 
 # --- THE ULTIMATE PATCH ---
-# This redefines the Dense layer to ignore any unknown metadata like 'quantization_config'
 @keras.saving.register_keras_serializable(package="Custom")
 class PatchedDense(keras.layers.Dense):
     def __init__(self, **kwargs):
-        # Explicitly remove the problematic key if it exists
         kwargs.pop('quantization_config', None)
         super().__init__(**kwargs)
 
 st.set_page_config(page_title="Emotion AI - Pritam Kumar")
 st.title("🎭 Real-Time Emotion Recognition")
-# app.py mein load_all ke andar ye change karein:
+
 @st.cache_resource
 def load_all():
-    # Force Keras to recognize our PatchedDense for ANY Dense layer it finds
-    from keras.src.saving import serialization_lib
-    serialization_lib.add_rewrite_data("Dense", PatchedDense)
-    
-    model = keras.models.load_model(
-        "emotion_model.keras", 
-        custom_objects={"Dense": PatchedDense}, 
-        compile=False, 
-        safe_mode=False
-    )
-    cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
-    return model, cascade
+    # FIX: Corrected the try-except block structure
+    try:
+        from keras.src.saving import serialization_lib
+        serialization_lib.add_rewrite_data("Dense", PatchedDense)
+        
+        model = keras.models.load_model(
+            "emotion_model.keras", 
+            custom_objects={"Dense": PatchedDense}, 
+            compile=False, 
+            safe_mode=False
+        )
+        cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
+        return model, cascade
     except Exception as e:
         st.error(f"Error loading model: {e}")
         return None, None
 
 model, face_cascade = load_all()
-
 labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
 
 def callback(frame):
     img = frame.to_ndarray(format="bgr24")
-    if model is None: return av.VideoFrame.from_ndarray(img, format="bgr24")
+    if model is None or face_cascade is None: 
+        return av.VideoFrame.from_ndarray(img, format="bgr24")
     
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
@@ -66,6 +65,7 @@ def callback(frame):
         
     return av.VideoFrame.from_ndarray(img, format="bgr24")
 
+# UI Settings
 webrtc_streamer(
     key="emotion",
     mode=WebRtcMode.SENDRECV,
@@ -74,4 +74,3 @@ webrtc_streamer(
     media_stream_constraints={"video": True, "audio": False},
     async_processing=True
 )
-
