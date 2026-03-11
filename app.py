@@ -15,18 +15,15 @@ st.title("🎭 Real-Time Emotion Recognition")
 # Load model and face detector
 @st.cache_resource
 def load_all():
-
-    model = tf.keras.models.load_model(
-        "emotion_model.keras",
-        compile=False
+    # Model loading logic with Keras 3 compatibility
+    import keras
+    model = keras.models.load_model(
+        "emotion_model.keras", 
+        compile=False, 
+        safe_mode=False  # Ye line metadata errors ko bypass karegi
     )
-
-    cascade = cv2.CascadeClassifier(
-        "haarcascade_frontalface_default.xml"
-    )
-
+    cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
     return model, cascade
-
 
 model, face_cascade = load_all()
 
@@ -131,3 +128,4 @@ else:
         img = detect_emotion(img)
 
         st.image(img, channels="BGR")
+
