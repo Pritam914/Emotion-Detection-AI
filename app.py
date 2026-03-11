@@ -3,15 +3,15 @@ import cv2
 import numpy as np
 import tensorflow as tf
 import keras
-from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration
+from streamlit_webrtc import webrtc_streamer, WebRtcMode
 import av
 import os
 
-# System Level Fixes
+# CPU aur Protocol Buffer optimization
 os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
 cv2.setNumThreads(0)
 
-# Patch to handle Keras 3 metadata errors
+# Keras metadata error fix karne ke liye Custom Layer Patch
 @keras.saving.register_keras_serializable(package="Custom")
 class PatchedDense(keras.layers.Dense):
     def __init__(self, **kwargs):
@@ -19,38 +19,37 @@ class PatchedDense(keras.layers.Dense):
         kwargs.pop('optional', None)
         super().__init__(**kwargs)
 
-st.set_page_config(page_title="Emotion AI - Pritam Kumar", layout="centered")
+st.set_page_config(page_title="Emotion AI - Pritam Kumar")
 st.title("🎭 Real-Time Emotion Recognition")
 
 @st.cache_resource
 def load_all():
-    # LIST ALL POSSIBLE FILENAMES IN YOUR REPO
-    # 
-    filenames = ["emotion_model.keras", "emotion_detection.h5", "model.keras", "model.h5"]
     model = None
+    # Repo scan karke model file dhoondna
+    files = os.listdir('.')
+    model_files = [f for f in files if f.endswith('.keras') or f.endswith('.h5')]
     
-    for fname in filenames:
-        if os.path.exists(fname):
-            try:
-                model = keras.models.load_model(
-                    fname, 
-                    custom_objects={"Dense": PatchedDense}, 
-                    compile=False, 
-                    safe_mode=False
-                )
-                st.success(f"✅ Loaded: {fname}")
-                break
-            except Exception as e:
-                continue
+    if model_files:
+        target = model_files[0]
+        try:
+            model = keras.models.load_model(
+                target, 
+                custom_objects={"Dense": PatchedDense, "PatchedDense": PatchedDense}, 
+                compile=False, 
+                safe_mode=False
+            )
+            st.sidebar.success(f"✅ Model Loaded: {target}")
+        except Exception as e:
+            st.sidebar.error(f"Error: {e}")
     
-    # Standard Face Detector from OpenCV
+    # Face cascade loading
     cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
     return model, cascade
 
 model, face_cascade = load_all()
 
 if model is None:
-    st.error("❌ Model File Not Found! Ensure your .keras file is in the root folder of GitHub and named correctly.")
+    st.error("❌ Model file nahi mili! Check karein ki .keras file main folder mein hai ya nahi.")
 
 labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
 
@@ -75,18 +74,12 @@ def callback(frame):
         
     return av.VideoFrame.from_ndarray(img, format="bgr24")
 
-# UNIVERSAL AUTO-START WEBCAM
-# 
+# Universal Direct Camera (Selection dropdown hataya gaya hai)
 webrtc_streamer(
-    key="emotion-universal",
+    key="emotion-ai",
     mode=WebRtcMode.SENDRECV,
     video_frame_callback=callback,
-    async_processing=True,
-    rtc_configuration={
-        "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
-    },
-    media_stream_constraints={
-        "video": True, # Strictly triggers camera
-        "audio": False
-    },
+    rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+    media_stream_constraints={"video": True, "audio": False},
+    async_processing=True
 )
