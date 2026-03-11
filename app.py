@@ -16,10 +16,10 @@ st.title("🎭 Real-Time Emotion Recognition")
 # Load model and cascade once
 @st.cache_resource
 def load_all():
-    model = tf.keras.models.load_model(
+   model = tf.keras.models.load_model(
     "emotion_detection.h5",
     compile=False,
-    safe_mode=False
+    custom_objects={}
 )
     cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
     return model, cascade
@@ -92,4 +92,5 @@ else:
         img = detect_emotion(img)
 
         st.image(img, channels="BGR")
+
 
