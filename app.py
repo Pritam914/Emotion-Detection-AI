@@ -3,16 +3,15 @@ import cv2
 import numpy as np
 import tensorflow as tf
 import keras
-from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration
+from streamlit_webrtc import webrtc_streamer, WebRtcMode
 import av
 import os
-from pathlib import Path
 
-# Fix for system threads and buffers
+# Performance Tuning
 os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
 cv2.setNumThreads(0)
 
-# Keras metadata patch
+# Keras Metadata Error Patch
 @keras.saving.register_keras_serializable(package="Custom")
 class PatchedDense(keras.layers.Dense):
     def __init__(self, **kwargs):
@@ -25,31 +24,34 @@ st.title("🎭 Real-Time Emotion Recognition")
 
 @st.cache_resource
 def load_all():
-    BASE_DIR = Path(__file__).resolve().parent
-    model = None
-    # Auto-scan root directory for any model file
-    files = list(BASE_DIR.glob("*.keras")) + list(BASE_DIR.glob("*.h5"))
+    # SCANNING ALL FILES IN THE DIRECTORY
+    all_files = os.listdir('.')
+    st.sidebar.write("Found Files:", all_files) # Ye debug ke liye help karega
     
-    if files:
-        target_path = files[0]
+    # Model dhoondne ka flexible tareeka
+    model_files = [f for f in all_files if f.endswith('.keras') or f.endswith('.h5')]
+    
+    model = None
+    if model_files:
+        target = model_files[0]
         try:
             model = keras.models.load_model(
-                str(target_path), 
+                target, 
                 custom_objects={"Dense": PatchedDense}, 
                 compile=False, 
                 safe_mode=False
             )
-            st.sidebar.success(f"✅ Auto-Detected: {target_path.name}")
+            st.sidebar.success(f"✅ Loaded: {target}")
         except Exception as e:
             st.sidebar.error(f"Error: {e}")
-    
+            
     cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
     return model, cascade
 
 model, face_cascade = load_all()
 
 if model is None:
-    st.error("❌ Model file (.keras or .h5) not found in root directory!")
+    st.error("❌ Model file still not found in GitHub Root Folder.")
     st.stop()
 
 labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
@@ -70,12 +72,11 @@ def callback(frame):
         
     return av.VideoFrame.from_ndarray(img, format="bgr24")
 
-# UNIVERSAL AUTO-CAMERA (Direct access)
 webrtc_streamer(
-    key="emotion-ai-universal",
+    key="emotion-final",
     mode=WebRtcMode.SENDRECV,
     video_frame_callback=callback,
-    async_processing=True,
     rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
-    media_stream_constraints={"video": True, "audio": False}
+    media_stream_constraints={"video": True, "audio": False},
+    async_processing=True
 )
