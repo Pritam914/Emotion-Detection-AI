@@ -6,12 +6,13 @@ import keras
 from streamlit_webrtc import webrtc_streamer, WebRtcMode
 import av
 import os
+from pathlib import Path
 
-# CPU aur Protocol Buffer optimization
+# Fix for Protocol Buffers and Threads
 os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
 cv2.setNumThreads(0)
 
-# Keras metadata error fix karne ke liye Custom Layer Patch
+# Keras 3 Patch for Metadata
 @keras.saving.register_keras_serializable(package="Custom")
 class PatchedDense(keras.layers.Dense):
     def __init__(self, **kwargs):
@@ -24,39 +25,43 @@ st.title("🎭 Real-Time Emotion Recognition")
 
 @st.cache_resource
 def load_all():
-    model = None
-    # Repo scan karke model file dhoondna
-    files = os.listdir('.')
-    model_files = [f for f in files if f.endswith('.keras') or f.endswith('.h5')]
+    # Streamlit Cloud ke liye absolute path nikalna
+    BASE_DIR = Path(__file__).resolve().parent
+    model_path = BASE_DIR / "emotion_model.keras"
+    cascade_path = BASE_DIR / "haarcascade_frontalface_default.xml"
     
-    if model_files:
-        target = model_files[0]
+    model = None
+    if model_path.exists():
         try:
             model = keras.models.load_model(
-                target, 
-                custom_objects={"Dense": PatchedDense, "PatchedDense": PatchedDense}, 
+                str(model_path), 
+                custom_objects={"Dense": PatchedDense}, 
                 compile=False, 
                 safe_mode=False
             )
-            st.sidebar.success(f"✅ Model Loaded: {target}")
+            st.sidebar.success(f"✅ Model Loaded: {model_path.name}")
         except Exception as e:
-            st.sidebar.error(f"Error: {e}")
-    
-    # Face cascade loading
-    cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+            st.sidebar.error(f"Error loading model: {e}")
+    else:
+        # Emergency Scan if path fails
+        files = list(BASE_DIR.glob("*.keras")) + list(BASE_DIR.glob("*.h5"))
+        if files:
+            model = keras.models.load_model(str(files[0]), custom_objects={"Dense": PatchedDense}, compile=False, safe_mode=False)
+            st.sidebar.warning(f"⚠️ Loaded via scan: {files[0].name}")
+
+    cascade = cv2.CascadeClassifier(str(cascade_path))
     return model, cascade
 
 model, face_cascade = load_all()
 
 if model is None:
-    st.error("❌ Model file nahi mili! Check karein ki .keras file main folder mein hai ya nahi.")
+    st.error("❌ Model file still not found. Check your GitHub root directory!")
+    st.stop()
 
 labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
 
 def callback(frame):
     img = frame.to_ndarray(format="bgr24")
-    if model is None: return av.VideoFrame.from_ndarray(img, format="bgr24")
-    
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
 
@@ -74,9 +79,8 @@ def callback(frame):
         
     return av.VideoFrame.from_ndarray(img, format="bgr24")
 
-# Universal Direct Camera (Selection dropdown hataya gaya hai)
 webrtc_streamer(
-    key="emotion-ai",
+    key="emotion-ai-final",
     mode=WebRtcMode.SENDRECV,
     video_frame_callback=callback,
     rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
