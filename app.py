@@ -16,14 +16,10 @@ st.title("🎭 Real-Time Emotion Recognition")
 # Load model and cascade once
 @st.cache_resource
 def load_all():
-    model = tf.keras.models.load_model(
-        "emotion_detection.h5",
-        compile=False,
-        safe_mode=False
-    )
+    from keras.models import load_model
+    model = load_model("emotion_detection.h5", compile=False)
     cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
-    return model, cascade
-model, face_cascade = load_all()
+    return model, cascademodel, face_cascade = load_all()
 
 labels = {
     0: "Angry",
@@ -91,6 +87,7 @@ else:
         img = detect_emotion(img)
 
         st.image(img, channels="BGR")
+
 
 
 
