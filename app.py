@@ -2,9 +2,9 @@ import streamlit as st
 import cv2
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.models import load_model
 from streamlit_webrtc import webrtc_streamer
 import av
+from keras.models import load_model
 
 # Reduce CPU usage
 cv2.setNumThreads(0)
@@ -16,10 +16,12 @@ st.title("🎭 Real-Time Emotion Recognition")
 # Load model and cascade once
 @st.cache_resource
 def load_all():
-    from keras.models import load_model
     model = load_model("emotion_detection.h5", compile=False)
     cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
-    return model, cascademodel, face_cascade = load_all()
+    return model, cascade
+
+# Call function OUTSIDE
+model, face_cascade = load_all()
 
 labels = {
     0: "Angry",
@@ -29,7 +31,7 @@ labels = {
     4: "Surprised"
 }
 
-# Emotion detection function
+# Emotion detection
 def detect_emotion(img):
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -87,7 +89,3 @@ else:
         img = detect_emotion(img)
 
         st.image(img, channels="BGR")
-
-
-
-
