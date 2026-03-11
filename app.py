@@ -22,21 +22,21 @@ class PatchedDense(keras.layers.Dense):
 
 st.set_page_config(page_title="Emotion AI - Pritam Kumar")
 st.title("🎭 Real-Time Emotion Recognition")
-
+# app.py mein load_all ke andar ye change karein:
 @st.cache_resource
 def load_all():
-    # Force Keras to use our PatchedDense instead of the default one
-    custom_objects = {"Dense": PatchedDense}
+    # Force Keras to recognize our PatchedDense for ANY Dense layer it finds
+    from keras.src.saving import serialization_lib
+    serialization_lib.add_rewrite_data("Dense", PatchedDense)
     
-    try:
-        model = keras.models.load_model(
-            "emotion_model.keras", 
-            custom_objects=custom_objects, 
-            compile=False,
-            safe_mode=False
-        )
-        cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
-        return model, cascade
+    model = keras.models.load_model(
+        "emotion_model.keras", 
+        custom_objects={"Dense": PatchedDense}, 
+        compile=False, 
+        safe_mode=False
+    )
+    cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
+    return model, cascade
     except Exception as e:
         st.error(f"Error loading model: {e}")
         return None, None
@@ -74,3 +74,4 @@ webrtc_streamer(
     media_stream_constraints={"video": True, "audio": False},
     async_processing=True
 )
+
