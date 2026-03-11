@@ -7,15 +7,16 @@ from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration
 import av
 import os
 
-# Performance and Compatibility
+# System Level Fixes
 os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
 cv2.setNumThreads(0)
 
-# Patch to handle Keras metadata issues
+# Patch to handle Keras 3 metadata errors
 @keras.saving.register_keras_serializable(package="Custom")
 class PatchedDense(keras.layers.Dense):
     def __init__(self, **kwargs):
         kwargs.pop('quantization_config', None)
+        kwargs.pop('optional', None)
         super().__init__(**kwargs)
 
 st.set_page_config(page_title="Emotion AI - Pritam Kumar", layout="centered")
@@ -23,8 +24,9 @@ st.title("🎭 Real-Time Emotion Recognition")
 
 @st.cache_resource
 def load_all():
-    # Try multiple filenames in case of mismatch
-    filenames = ["emotion_model.keras", "emotion_detection.h5", "model.h5"]
+    # LIST ALL POSSIBLE FILENAMES IN YOUR REPO
+    # 
+    filenames = ["emotion_model.keras", "emotion_detection.h5", "model.keras", "model.h5"]
     model = None
     
     for fname in filenames:
@@ -36,22 +38,19 @@ def load_all():
                     compile=False, 
                     safe_mode=False
                 )
+                st.success(f"✅ Loaded: {fname}")
                 break
-            except:
+            except Exception as e:
                 continue
     
-    # Load Face Detector
+    # Standard Face Detector from OpenCV
     cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-    if not os.path.exists("haarcascade_frontalface_default.xml"):
-         # Fallback to local if xml exists in repo
-         cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
-         
     return model, cascade
 
 model, face_cascade = load_all()
 
 if model is None:
-    st.error("❌ Model File Not Found! Please check if your .keras or .h5 file is in the main folder of GitHub.")
+    st.error("❌ Model File Not Found! Ensure your .keras file is in the root folder of GitHub and named correctly.")
 
 labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
 
@@ -76,18 +75,18 @@ def callback(frame):
         
     return av.VideoFrame.from_ndarray(img, format="bgr24")
 
-# Universal WebRtc (No Device Selection dropdown)
+# UNIVERSAL AUTO-START WEBCAM
+# 
 webrtc_streamer(
     key="emotion-universal",
     mode=WebRtcMode.SENDRECV,
     video_frame_callback=callback,
     async_processing=True,
-    # This hides the extra device UI and forces auto-start
     rtc_configuration={
         "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
     },
     media_stream_constraints={
-        "video": True,
+        "video": True, # Strictly triggers camera
         "audio": False
     },
 )
