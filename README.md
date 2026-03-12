@@ -45,19 +45,19 @@
       <td width="33%" align="center" style="padding: 10px;">
         <div style="border: 1px solid #333; border-radius: 10px; padding: 10px; background: #161b22;">
           <b>Real-Time Live Feed</b><br><br>
-          <img src="https://via.placeholder.com/400x250?text=Live+Result+Screenshot" width="100%" style="border-radius: 5px;" alt="Live Result">
+          <img src="dt 2.jpeg" width="100%" style="border-radius: 5px;" alt="Live Result">
         </div>
       </td>
       <td width="33%" align="center" style="padding: 10px;">
         <div style="border: 1px solid #333; border-radius: 10px; padding: 10px; background: #161b22;">
           <b>Group Photo Analysis</b><br><br>
-          <img src="https://via.placeholder.com/400x250?text=Group+Result+Screenshot" width="100%" style="border-radius: 5px;" alt="Group Result">
+          <img src="dt3.jpeg" width="100%" style="border-radius: 5px;" alt="Group Result">
         </div>
       </td>
       <td width="33%" align="center" style="padding: 10px;">
         <div style="border: 1px solid #333; border-radius: 10px; padding: 10px; background: #161b22;">
           <b>High-Res Uploads</b><br><br>
-          <img src="https://via.placeholder.com/400x250?text=Upload+Result+Screenshot" width="100%" style="border-radius: 5px;" alt="Upload Result">
+          <img src="dt1.jpeg" width="100%" style="border-radius: 5px;" alt="Upload Result">
         </div>
       </td>
     </tr>
