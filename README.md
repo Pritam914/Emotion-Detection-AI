@@ -1,120 +1,91 @@
-🎭 Emotion Detection AI
+<div align="center">
+  <h1>🎭 Real-Time Emotion Recognition AI</h1>
+  <p><i>Developed with passion by <b>Pritam Kumar</b></i></p>
+  
+  <a href="https://emotion-detection-ai-nwfybvjapxbs5jhbtpd4cy.streamlit.app">
+    <img src="https://static.streamlit.io/badges/streamlit_badge_svg.svg" alt="Streamlit App">
+  </a>
+  <br><br>
+  <strong>A high-fidelity Deep Learning application optimized for real-time and group facial analysis.</strong>
+</div>
 
-An AI-based Emotion Detection system that detects human emotions in real-time using Computer Vision and Deep Learning.
+<hr>
 
-The system captures facial expressions from webcam input and predicts emotions such as:
+<div align="center">
+  <a href="https://emotion-detection-ai-nwfybvjapxbs5jhbtpd4cy.streamlit.app">🚀 Live Demo</a> •
+  <a href="#key-features">🧠 Features</a> •
+  <a href="#technical-stack">🛠️ Tech Stack</a> •
+  <a href="#contact">📬 Contact</a>
+</div>
 
-🙂 Happy
-😢 Sad
-😠 Angry
-😲 Surprise
-😐 Neutral
+<hr>
 
----
-
-🚀 Result Showcase
-
-«📌 Add your result screenshots below (replace images later)»
-
+<h2 id="showcase">📸 Project Showcase</h2>
 <p align="center">
-  <img src="images/result1.png" width="600" alt="Result Screenshot 1"/>
-</p><p align="center">
-  <img src="images/result2.png" width="600" alt="Result Screenshot 2"/>
-</p>⚠️ Create an images folder and upload your screenshots there.
+  <table width="100%">
+    <tr>
+      <td width="33%" align="center">
+        <b>Real-Time Live Feed</b><br>
+        <img src="https://via.placeholder.com/400x250?text=Live+Result+Screenshot" width="100%" alt="Live Result">
+      </td>
+      <td width="33%" align="center">
+        <b>Group Photo Analysis</b><br>
+        <img src="https://via.placeholder.com/400x250?text=Group+Result+Screenshot" width="100%" alt="Group Result">
+      </td>
+      <td width="33%" align="center">
+        <b>High-Res Uploads</b><br>
+        <img src="https://via.placeholder.com/400x250?text=Upload+Result+Screenshot" width="100%" alt="Upload Result">
+      </td>
+    </tr>
+  </table>
+</p>
 
----
+<blockquote>
+  <b>💡 Note:</b> To showcase your real work, replace the placeholder links above with your actual result images stored in your repository.
+</blockquote>
 
-🧠 Features
+<hr>
 
-- Real-time face detection using OpenCV
-- Emotion prediction using Deep Learning (CNN)
-- Webcam live emotion recognition
-- Pre-trained model support
-- Fast and lightweight implementation
-- Easy to run locally
+<h2 id="key-features">🧠 Key Engineering Features</h2>
+<ul>
+  <li><b>Adaptive Rescaling:</b> Automatically handles high-resolution images to prevent OpenCV memory crashes (Fixed <code>scaleIdx</code> assertion errors).</li>
+  <li><b>Contrast Enhancement (CLAHE):</b> Integrated Contrast Limited Adaptive Histogram Equalization for accurate detection in low-light and complex group settings.</li>
+  <li><b>Temporal Stability:</b> Optimized for low-latency inference on both Mobile and Desktop browsers via Streamlit-WebRTC.</li>
+  <li><b>Multi-Face Support:</b> Specifically fine-tuned to detect up to 15 faces in a single frame.</li>
+</ul>
 
----
+<hr>
 
-🛠️ Tech Stack
+<h2 id="technical-stack">🛠️ Technical Stack</h2>
+<table>
+  <tr>
+    <td><b>Deep Learning</b></td>
+    <td>TensorFlow, Keras (CNN Architecture), FER2013 Dataset</td>
+  </tr>
+  <tr>
+    <td><b>Computer Vision</b></td>
+    <td>OpenCV (Haar-Cascade Classifiers)</td>
+  </tr>
+  <tr>
+    <td><b>Web Framework</b></td>
+    <td>Streamlit, Streamlit-WebRTC</td>
+  </tr>
+  <tr>
+    <td><b>Language</b></td>
+    <td>Python 3.10+</td>
+  </tr>
+</table>
 
-- Python 🐍
-- TensorFlow / Keras
-- OpenCV
-- NumPy
-- Deep Learning (CNN)
-- Haarcascade Face Detection
+<hr>
 
----
+<h2>⚙️ Setup Instructions</h2>
 
-📂 Project Structure
+```bash
+# Clone the repository
+git clone [https://github.com/YOUR_USERNAME/emotion-detection-ai.git](https://github.com/YOUR_USERNAME/emotion-detection-ai.git)
 
-Emotion-Detection-AI/
-│
-├── app.py
-├── emotion_detection.h5
-├── haarcascade_frontalface.xml
-├── requirements.txt
-├── README.md
-└── images/
-    ├── result1.png
-    └── result2.png
-
----
-
-⚙️ Installation
-
-1️⃣ Clone Repository
-
-git clone https://github.com/Pritam914/Emotion-Detection-AI.git
-cd Emotion-Detection-AI
-
-2️⃣ Install Dependencies
-
+# Install dependencies
 pip install -r requirements.txt
 
----
-
-▶️ Run the Project
-
-python app.py
-
-After running, your webcam will open and start detecting emotions in real-time.
-
----
-
-🧪 Model Details
-
-- Model Type: Convolutional Neural Network (CNN)
-- Input: Detected face image
-- Output: Emotion label
-- Model Format: ".h5"
-
----
-
-📈 Future Improvements
-
-- Web deployment using Streamlit
-- Improve accuracy with larger datasets
-- Add more emotion categories
-- Deploy as mobile application
-- Real-time analytics dashboard
-
----
-
-🤝 Contribution
-
-Contributions are welcome!
-Fork the repository and create a pull request.
-
----
-
-👨‍💻 Author
-
-Pritam Kumar
-B.Tech CSE | AI/ML Enthusiast
-
----
-
-⭐ Support
-
-If you like this project, please give it a ⭐ on GitHub!
+# Launch the app
+streamlit run app.py
