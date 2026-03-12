@@ -33,7 +33,7 @@ st.markdown("""
     }
     .stTabs [aria-selected="true"] { background-color: #ff4b4b !important; }
     div[data-testid="stSidebarNav"] { display: none; }
-    .info-card { background-color: #1e2130; padding: 20px; border-radius: 15px; border-left: 5px solid #ff4b4b; margin-bottom: 20px;}
+    .info-card { background-color: #1e2130; padding: 25px; border-radius: 15px; border-left: 5px solid #ff4b4b; margin-bottom: 20px;}
     </style>
     """, unsafe_allow_html=True)
 
@@ -59,12 +59,9 @@ def process_emotion(image):
         h, w = image.shape[:2]
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    
-    # Accuracy Boost: Advanced Histogram Equalization (CLAHE)
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
     gray_enhanced = clahe.apply(gray)
     
-    # Face Detection Logic
     faces = face_cascade.detectMultiScale(
         gray_enhanced, 
         scaleFactor=1.1, 
@@ -76,20 +73,14 @@ def process_emotion(image):
         return "limit", len(faces)
     
     for (x, y, fw, fh) in faces:
-        # Preprocessing ROI for Model Accuracy
         roi_gray = gray_enhanced[y:y+fh, x:x+fw]
         roi_gray = cv2.resize(roi_gray, (48, 48))
-        
-        # Noise Reduction & Normalization
         roi_gray = cv2.GaussianBlur(roi_gray, (3, 3), 0)
         roi_gray = roi_gray.astype("float32") / 255.0
         roi_gray = np.reshape(roi_gray, (1, 48, 48, 1))
         
-        # Prediction
         prediction = model.predict(roi_gray, verbose=0)
         idx = np.argmax(prediction)
-        
-        # Confidence Check (Optional but good for quality)
         label = emotion_labels[idx]
         color = color_map[idx]
         
@@ -110,7 +101,7 @@ def callback(frame):
     return av.VideoFrame.from_ndarray(processed_img, format="bgr24")
 
 # --- UI Structure ---
-tab_info, tab_live, tab_upload = st.tabs(["🏠 Info", "🎥 Live Camera", "📤 Upload Image"])
+tab_info, tab_live, tab_upload = st.tabs(["🏠 Home Info", "🎥 Live Detection", "📤 Upload Image"])
 
 with tab_info:
     st.markdown('<div class="info-card">', unsafe_allow_html=True)
@@ -118,11 +109,22 @@ with tab_info:
     with col1:
         st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=120)
     with col2:
-        st.subheader("Pritam Kumar | Emotion AI")
-        st.write("Optimized Deep Learning system with Gaussian noise reduction and CLAHE contrast enhancement for maximum accuracy.")
+        st.subheader("Emotion Recognition AI")
+        st.write("A professional-grade Deep Learning system designed to interpret facial micro-expressions in real-time.")
     
     st.markdown("---")
-    st.subheader("Connect & Feedback")
+    st.subheader("System Overview")
+    st.markdown("""
+    - **Architecture:** Convolutional Neural Network (CNN) optimized for FER2013.
+    - **Face Tracking:** Robust Haar-Cascade multi-face detection (optimized for groups).
+    - **Image Processing:** CLAHE contrast enhancement and Gaussian noise reduction.
+    - **Stability:** Dynamic rescaling for high-resolution input handling.
+    """)
+    
+    st.markdown("---")
+    st.subheader("📬 Feedback & Contact")
+    st.info("I am constantly working to improve this model's accuracy. If you notice any incorrect detections, please share the result with me via the links below. Your feedback is invaluable!")
+    
     c1, c2, c3 = st.columns(3)
     c1.markdown("[🔗 LinkedIn](https://www.linkedin.com/in/pritam-kumar-607631334)")
     c2.markdown("[📸 Instagram](https://www.instagram.com/pritamray26)")
@@ -130,6 +132,7 @@ with tab_info:
     st.markdown('</div>', unsafe_allow_html=True)
 
 with tab_live:
+    st.info("Directly accessing front camera. Best used in well-lit conditions.")
     webrtc_streamer(
         key="emotion-live-accurate",
         mode=WebRtcMode.SENDRECV,
@@ -140,7 +143,7 @@ with tab_live:
     )
 
 with tab_upload:
-    file = st.file_uploader("Upload Image (High Accuracy Mode)", type=['jpg', 'png', 'jpeg'])
+    file = st.file_uploader("Upload Image (Max 15 faces)", type=['jpg', 'png', 'jpeg'])
     if file:
         file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
         img = cv2.imdecode(file_bytes, 1)
@@ -149,11 +152,11 @@ with tab_upload:
             result = process_emotion(img)
             
             if result == "limit":
-                st.error("Detected >15 faces. Please use a smaller group photo.")
+                st.error("Too many faces! Please upload an image with up to 15 members.")
             else:
                 processed_img, count = result
                 st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_column_width=True)
-                st.success(f"Detection complete! Found {count} face(s).")
+                st.success(f"Analysis complete! Detected {count} face(s).")
                 
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                 _, enc = cv2.imencode('.jpg', processed_img)
