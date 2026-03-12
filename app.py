@@ -50,39 +50,48 @@ emotion_labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"
 color_map = {0: (0, 0, 255), 1: (0, 255, 0), 2: (255, 255, 255), 3: (255, 0, 0), 4: (0, 255, 255)}
 
 def process_frame(frame):
-    # CRASH FIX & SCALE: Increased allowed dimension for group details
+    # --- FIX 1: Universal Size Handler (Prevents all Crashes) ---
     h, w = frame.shape[:2]
-    if max(h, w) > 1200:
-        scale = 1200 / max(h, w)
-        frame = cv2.resize(frame, (int(w * scale), int(h * scale)))
+    # Scaling down if too large, scaling up if too small for the model
+    target_dim = 1100
+    if max(h, w) > target_dim or max(h, w) < 200:
+        scale = target_dim / max(h, w)
+        frame = cv2.resize(frame, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
         h, w = frame.shape[:2]
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     
-    # GROUP OPTIMIZATION: Balances shadows and highlights for group photos
-    gray = cv2.equalizeHist(gray) 
+    # --- FIX 2: Accuracy Boost (CLAHE for better Contrast) ---
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    gray = clahe.apply(gray)
     
-    # ACCURACY FIX: Lower scaleFactor (1.05) scans more layers for small faces
-    # Lower minNeighbors (3) allows detection of partially visible faces in crowd
-    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.05, minNeighbors=3, minSize=(30, 30))
+    # Optimized for both single and group (12+ members) detection
+    faces = face_cascade.detectMultiScale(
+        gray, 
+        scaleFactor=1.1, # Balance between speed and accuracy
+        minNeighbors=5,  # Reduces false positives while keeping small faces
+        minSize=(30, 30) # Catch piche wale small faces
+    )
     
-    thickness = max(2, int(w / 600))
-    font_scale = max(0.5, w / 1000)
+    thickness = max(2, int(w / 500))
+    font_scale = max(0.5, w / 900)
     
     for (x, y, fw, fh) in faces:
+        # Preprocessing ROI
         roi = gray[y:y+fh, x:x+fw]
         roi = cv2.resize(roi, (48, 48)) / 255.0
         roi = np.reshape(roi, (1, 48, 48, 1))
         
+        # Fast Inference
         prediction = model.predict(roi, verbose=0)
         idx = np.argmax(prediction)
         label = emotion_labels[idx]
         color = color_map[idx]
         
-        # UI FIX: Moves label below box if near top edge to prevent cutting
+        # Layout Fix: Dynamic Label Placement
         text_y = y - 10 if y - 10 > 25 else y + fh + 30
         
-        # High-Contrast Labels
+        # High-Visibility UI
         cv2.putText(frame, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, (0, 0, 0), thickness + 2)
         cv2.putText(frame, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, color, thickness)
         cv2.rectangle(frame, (x, y), (x+fw, y+fh), color, thickness)
@@ -109,14 +118,14 @@ with tab_home:
     st.markdown("---")
     st.subheader("System Overview")
     st.markdown("""
-    - **Face Tracking:** Robust Haar-Cascade multi-face detection (Optimized for Groups).
-    - **Express Inference:** Real-time classification (Angry, Happy, Neutral, Sad, Surprised).
-    - **Stability:** Histogram equalization for inconsistent lighting environments.
+    - **Face Tracking:** High-accuracy Haar-Cascade detection (Optimized for Groups).
+    - **Express Inference:** CNN-based emotion classification.
+    - **Stability:** Universal image standardizer to prevent resolution-based crashes.
     """)
     
     st.markdown("---")
     st.subheader("📬 Contact & Feedback")
-    st.write("Encountered an issue or have suggestions? Sharing your results helps me improve!")
+    st.write("Sharing your results or feedback helps me improve!")
     
     c1, c2, c3 = st.columns(3)
     c1.markdown("[🔗 LinkedIn](https://www.linkedin.com/in/pritam-kumar-607631334)")
@@ -127,7 +136,7 @@ with tab_home:
 with tab_live:
     st.info("Best used in well-lit conditions. Ensure camera access is granted.")
     webrtc_streamer(
-        key="emotion-group-pro",
+        key="emotion-group-ultimate",
         mode=WebRtcMode.SENDRECV,
         rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
         video_frame_callback=callback,
@@ -140,7 +149,7 @@ with tab_upload:
     if file:
         file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
         img = cv2.imdecode(file_bytes, 1)
-        with st.spinner('Scanning all faces...'):
+        with st.spinner('Scanning faces and analyzing emotions...'):
             processed_img = process_frame(img)
             st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_column_width=True)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
