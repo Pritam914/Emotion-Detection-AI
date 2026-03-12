@@ -8,11 +8,11 @@ import av
 import os
 from collections import deque
 
-# System optimization for faster inference
+# Performance optimizations
 os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
 cv2.setNumThreads(0)
 
-# Keras Patch
+# Keras Deserialization Patch
 import keras
 @keras.saving.register_keras_serializable(package="Custom")
 class PatchedDense(keras.layers.Dense):
@@ -46,28 +46,39 @@ def setup_resources():
 
 model, face_cascade = setup_resources()
 
-# Color Coding for Emotions (BGR Format)
-# Happy: Green | Sad: Blue | Angry: Red | Surprised: Yellow | Neutral: White
 emotion_labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
 color_map = {
-    0: (0, 0, 255),    # Red
-    1: (0, 255, 0),    # Green
-    2: (255, 255, 255),# White
-    3: (255, 0, 0),    # Blue
-    4: (0, 255, 255)   # Yellow
+    0: (0, 0, 255),    # Angry: Red
+    1: (0, 255, 0),    # Happy: Green
+    2: (255, 255, 255),# Neutral: White
+    3: (255, 0, 0),    # Sad: Blue
+    4: (0, 255, 255)   # Surprised: Yellow
 }
 
 if 'emotion_buffer' not in st.session_state:
-    st.session_state.emotion_buffer = deque(maxlen=5)
+    st.session_state.emotion_buffer = deque(maxlen=10)
 
 def process_emotion(frame, smoothing=False):
+    # Step 1: Standardize size to prevent OpenCV ScaleData errors
     h, w = frame.shape[:2]
-    # Dynamic scaling for fonts
-    font_scale = max(1.2, w / 400.0) 
-    thickness = max(3, int(w / 200.0))
-    
+    max_dim = 1000
+    if max(h, w) > max_dim:
+        scale = max_dim / max(h, w)
+        frame = cv2.resize(frame, (int(w * scale), int(h * scale)))
+        h, w = frame.shape[:2]
+
+    # Step 2: Refined Detection (Higher minNeighbors to stop false positives)
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(gray, 1.1, 5, minSize=(40, 40))
+    faces = face_cascade.detectMultiScale(
+        gray, 
+        scaleFactor=1.2, 
+        minNeighbors=7, 
+        minSize=(60, 60)
+    )
+    
+    # Step 3: Adaptive Font Calculation
+    font_scale = max(0.8, w / 800.0) 
+    thickness = max(2, int(w / 350.0))
     
     for (x, y, fw, fh) in faces:
         fc = gray[y:y+fh, x:x+fw]
@@ -86,18 +97,16 @@ def process_emotion(frame, smoothing=False):
         label = emotion_labels[idx]
         color = color_map[idx]
         
-        # Prevent label clipping
-        text_y = y - 20 if y - 20 > 50 else y + fh + 60
+        # UI Positioning
+        text_y = y - 15 if y - 15 > 30 else y + fh + 40
         
         cv2.rectangle(frame, (x, y), (x+fw, y+fh), color, thickness)
-        # Background for text for better readability
         cv2.putText(frame, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, color, thickness)
         
     return frame
 
 def callback(frame):
     img = frame.to_ndarray(format="bgr24")
-    # Using lightweight processing for Live
     processed = process_emotion(img, smoothing=True)
     return av.VideoFrame.from_ndarray(processed, format="bgr24")
 
@@ -108,30 +117,25 @@ with tab_home:
     with col1:
         st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=120)
     with col2:
-        st.subheader("Developer: Pritam")
+        st.subheader("Developer: Pritam Kumar")
         st.write("Specialization: CSE (AIML)")
-        st.write("Real-time Facial Emotion Analysis via Deep Learning.")
+        st.write("Professional Facial Expression Analysis System.")
 
 with tab_live:
-    # Multiple STUN servers pool to bypass firewall/NAT issues
+    # Optimized for Mobile/Desktop Stability
     # 
     webrtc_streamer(
-        key="emotion-ai-optimized",
+        key="emotion-ai-final-v2",
         mode=WebRtcMode.SENDRECV,
         video_frame_callback=callback,
         rtc_configuration={
-            "iceServers": [
-                {"urls": ["stun:stun.l.google.com:19302"]},
-                {"urls": ["stun:stun1.l.google.com:19302"]},
-                {"urls": ["stun:stun2.l.google.com:19302"]}
-            ]
+            "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
         },
         media_stream_constraints={
             "video": {
                 "facingMode": "user",
-                "width": {"ideal": 640}, # Reduced resolution for stability on mobile
-                "height": {"ideal": 480},
-                "frameRate": {"ideal": 20}
+                "width": {"ideal": 640},
+                "height": {"ideal": 480}
             },
             "audio": False
         },
@@ -143,10 +147,10 @@ with tab_upload:
     if file:
         file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
         img = cv2.imdecode(file_bytes, 1)
-        with st.spinner('Analyzing...'):
+        with st.spinner('Processing...'):
             processed_img = process_emotion(img, smoothing=False)
             st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_column_width=True)
             
             _, img_encoded = cv2.imencode('.jpg', processed_img)
-            st.download_button("📥 Download Result", data=img_encoded.tobytes(), 
-                               file_name="detected_emotion.jpg", mime="image/jpeg")
+            st.download_button("📥 Download Analysis", data=img_encoded.tobytes(), 
+                               file_name="emotion_result.jpg", mime="image/jpeg")
