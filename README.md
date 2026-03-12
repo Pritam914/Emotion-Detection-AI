@@ -65,7 +65,6 @@
 
 <hr>
 
-<hr>
 
 <h2 id="technical-details">🧠 Technical Implementation</h2>
 <ul>
@@ -75,8 +74,6 @@
   <li><b>Inference Engine:</b> Real-time video processing is powered by <b>WebRTC</b>, enabling high-frequency frame analysis and low-latency feedback between the browser and the Python backend.</li>
   <li><b>Backend Stack:</b> The core logic is built with <b>TensorFlow</b> for model inference and <b>OpenCV</b> for computer vision operations, all integrated into a <b>Streamlit</b> interface.</li>
 </ul>
-
-<hr>
 
 
 <hr>
