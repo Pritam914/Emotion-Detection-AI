@@ -50,60 +50,58 @@ emotion_labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"
 color_map = {0: (0, 0, 255), 1: (0, 255, 0), 2: (255, 255, 255), 3: (255, 0, 0), 4: (0, 255, 255)}
 
 def process_frame(frame):
-    # --- FIX 1: Universal Size Handler (Prevents all Crashes) ---
     h, w = frame.shape[:2]
-    # Scaling down if too large, scaling up if too small for the model
-    target_dim = 1100
-    if max(h, w) > target_dim or max(h, w) < 200:
+    target_dim = 1000
+    if max(h, w) > target_dim:
         scale = target_dim / max(h, w)
         frame = cv2.resize(frame, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
         h, w = frame.shape[:2]
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     
-    # --- FIX 2: Accuracy Boost (CLAHE for better Contrast) ---
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    # Advanced Contrast for accuracy
+    clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8,8))
     gray = clahe.apply(gray)
     
-    # Optimized for both single and group (12+ members) detection
+    # --- ACCURACY UPGRADE: Increased minNeighbors to 12 to filter out objects ---
     faces = face_cascade.detectMultiScale(
         gray, 
-        scaleFactor=1.1, # Balance between speed and accuracy
-        minNeighbors=5,  # Reduces false positives while keeping small faces
-        minSize=(30, 30) # Catch piche wale small faces
+        scaleFactor=1.1, 
+        minNeighbors=12, 
+        minSize=(50, 50)
     )
     
+    # --- LIMIT CHECK: Maximum 10 faces for stability ---
+    if len(faces) > 10:
+        return "limit_exceeded", len(faces)
+
     thickness = max(2, int(w / 500))
     font_scale = max(0.5, w / 900)
     
     for (x, y, fw, fh) in faces:
-        # Preprocessing ROI
         roi = gray[y:y+fh, x:x+fw]
         roi = cv2.resize(roi, (48, 48)) / 255.0
         roi = np.reshape(roi, (1, 48, 48, 1))
         
-        # Fast Inference
         prediction = model.predict(roi, verbose=0)
         idx = np.argmax(prediction)
         label = emotion_labels[idx]
         color = color_map[idx]
         
-        # Layout Fix: Dynamic Label Placement
         text_y = y - 10 if y - 10 > 25 else y + fh + 30
-        
-        # High-Visibility UI
         cv2.putText(frame, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, (0, 0, 0), thickness + 2)
         cv2.putText(frame, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, color, thickness)
         cv2.rectangle(frame, (x, y), (x+fw, y+fh), color, thickness)
         
-    return frame
+    return frame, len(faces)
 
 def callback(frame):
     img = frame.to_ndarray(format="bgr24")
-    processed = process_frame(img)
+    processed, _ = process_frame(img)
+    if isinstance(processed, str): # Handle limit in live (ignore extra faces)
+        processed = img
     return av.VideoFrame.from_ndarray(processed, format="bgr24")
 
-# --- Tabs Structure ---
 tab_home, tab_live, tab_upload = st.tabs(["🏠 Home Info", "🎥 Live Camera", "📤 Upload Image"])
 
 with tab_home:
@@ -113,20 +111,18 @@ with tab_home:
         st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=120)
     with col2:
         st.subheader("Pritam's Emotion AI")
-        st.write("Professional Deep Learning system for real-time facial analysis.")
-    
+        st.write("Professional facial analysis system using Deep CNN.")
     st.markdown("---")
-    st.subheader("System Overview")
     st.markdown("""
-    - **Face Tracking:** High-accuracy Haar-Cascade detection (Optimized for Groups).
-    - **Express Inference:** CNN-based emotion classification.
-    - **Stability:** Universal image standardizer to prevent resolution-based crashes.
+    **Analysis Constraints:**
+    - **Face Limit:** Up to **10 faces** per image for maximum accuracy.
+    - **Optimization:** Filters out non-human objects automatically.
+    - **Stability:** Dynamic rescaling for high-resolution group pics.
     """)
     
     st.markdown("---")
     st.subheader("📬 Contact & Feedback")
-    st.write("Sharing your results or feedback helps me improve!")
-    
+    st.write("Sharing your results helps me improve!")
     c1, c2, c3 = st.columns(3)
     c1.markdown("[🔗 LinkedIn](https://www.linkedin.com/in/pritam-kumar-607631334)")
     c2.markdown("[📸 Instagram](https://www.instagram.com/pritamray26)")
@@ -134,7 +130,7 @@ with tab_home:
     st.markdown('</div>', unsafe_allow_html=True)
 
 with tab_live:
-    st.info("Best used in well-lit conditions. Ensure camera access is granted.")
+    st.info("Directly accessing front camera. Supported up to 10 faces.")
     webrtc_streamer(
         key="emotion-group-ultimate",
         mode=WebRtcMode.SENDRECV,
@@ -145,13 +141,18 @@ with tab_live:
     )
 
 with tab_upload:
-    file = st.file_uploader("Choose an image file", type=['jpg', 'png', 'jpeg'])
+    file = st.file_uploader("Upload image (Max 10 faces)", type=['jpg', 'png', 'jpeg'])
     if file:
         file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
         img = cv2.imdecode(file_bytes, 1)
-        with st.spinner('Scanning faces and analyzing emotions...'):
-            processed_img = process_frame(img)
-            st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_column_width=True)
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            _, img_encoded = cv2.imencode('.jpg', processed_img)
-            st.download_button("📥 Download Analysis", data=img_encoded.tobytes(), file_name=f"emotion_analysis_{ts}.jpg")
+        with st.spinner('Analyzing...'):
+            processed_img, count = process_frame(img)
+            
+            if processed_img == "limit_exceeded":
+                st.error(f"❌ Limit Exceeded: Detected {count} faces. Please upload an image with maximum 10 members for accurate analysis.")
+            else:
+                st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_column_width=True)
+                st.success(f"Analysis complete! Detected {count} face(s).")
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                _, img_encoded = cv2.imencode('.jpg', processed_img)
+                st.download_button("📥 Download Analysis", data=img_encoded.tobytes(), file_name=f"emotion_analysis_{ts}.jpg")
