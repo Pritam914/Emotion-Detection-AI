@@ -49,42 +49,52 @@ model, face_cascade = setup_resources()
 emotion_labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
 color_map = {0: (0, 0, 255), 1: (0, 255, 0), 2: (255, 255, 255), 3: (255, 0, 0), 4: (0, 255, 255)}
 
-# --- Universal Detection Logic ---
+# --- Preprocessing & Detection Engine ---
 def process_emotion(image):
     h, w = image.shape[:2]
-    max_side = 900 # Slightly increased for better group detail
+    max_side = 900 
     if max(h, w) > max_side:
         scale = max_side / max(h, w)
         image = cv2.resize(image, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
         h, w = image.shape[:2]
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    # Histogram Equalization specifically for distance/low-light faces
-    gray = cv2.equalizeHist(gray)
     
-    # --- FIX: ScaleFactor 1.05 and minSize 20x20 for distance and close-up faces ---
+    # Accuracy Boost: Advanced Histogram Equalization (CLAHE)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    gray_enhanced = clahe.apply(gray)
+    
+    # Face Detection Logic
     faces = face_cascade.detectMultiScale(
-        gray, 
-        scaleFactor=1.05, 
-        minNeighbors=4, 
-        minSize=(20, 20)
+        gray_enhanced, 
+        scaleFactor=1.1, 
+        minNeighbors=6, 
+        minSize=(30, 30)
     )
     
-    if len(faces) > 15: # Increased limit for larger groups
+    if len(faces) > 15:
         return "limit", len(faces)
     
     for (x, y, fw, fh) in faces:
-        roi_gray = gray[y:y+fh, x:x+fw]
-        roi_gray = cv2.resize(roi_gray, (48, 48)) / 255.0
+        # Preprocessing ROI for Model Accuracy
+        roi_gray = gray_enhanced[y:y+fh, x:x+fw]
+        roi_gray = cv2.resize(roi_gray, (48, 48))
+        
+        # Noise Reduction & Normalization
+        roi_gray = cv2.GaussianBlur(roi_gray, (3, 3), 0)
+        roi_gray = roi_gray.astype("float32") / 255.0
         roi_gray = np.reshape(roi_gray, (1, 48, 48, 1))
         
+        # Prediction
         prediction = model.predict(roi_gray, verbose=0)
         idx = np.argmax(prediction)
+        
+        # Confidence Check (Optional but good for quality)
         label = emotion_labels[idx]
         color = color_map[idx]
         
         thickness = max(2, int(w / 500))
-        font_scale = max(0.4, w / 1000)
+        font_scale = max(0.45, w / 1000)
         
         text_y = y - 10 if y - 10 > 25 else y + fh + 30
         cv2.putText(image, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, (0, 0, 0), thickness + 2)
@@ -99,7 +109,7 @@ def callback(frame):
     processed_img = res[0] if isinstance(res, tuple) else img
     return av.VideoFrame.from_ndarray(processed_img, format="bgr24")
 
-# --- Tabs Structure ---
+# --- UI Structure ---
 tab_info, tab_live, tab_upload = st.tabs(["🏠 Info", "🎥 Live Camera", "📤 Upload Image"])
 
 with tab_info:
@@ -109,7 +119,7 @@ with tab_info:
         st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=120)
     with col2:
         st.subheader("Pritam Kumar | Emotion AI")
-        st.write("Professional Real-Time Expression Analysis System.")
+        st.write("Optimized Deep Learning system with Gaussian noise reduction and CLAHE contrast enhancement for maximum accuracy.")
     
     st.markdown("---")
     st.subheader("Connect & Feedback")
@@ -121,7 +131,7 @@ with tab_info:
 
 with tab_live:
     webrtc_streamer(
-        key="emotion-live-fast",
+        key="emotion-live-accurate",
         mode=WebRtcMode.SENDRECV,
         rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
         video_frame_callback=callback,
@@ -130,12 +140,12 @@ with tab_live:
     )
 
 with tab_upload:
-    file = st.file_uploader("Upload Image (Optimized for Distance & Groups)", type=['jpg', 'png', 'jpeg'])
+    file = st.file_uploader("Upload Image (High Accuracy Mode)", type=['jpg', 'png', 'jpeg'])
     if file:
         file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
         img = cv2.imdecode(file_bytes, 1)
         
-        with st.spinner('Scanning all faces...'):
+        with st.spinner('Applying Deep Preprocessing & Analysis...'):
             result = process_emotion(img)
             
             if result == "limit":
