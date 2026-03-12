@@ -33,7 +33,8 @@ st.markdown("""
     }
     .stTabs [aria-selected="true"] { background-color: #ff4b4b !important; }
     div[data-testid="stSidebarNav"] { display: none; }
-    .contact-card { background-color: #1e2130; padding: 20px; border-radius: 10px; border-left: 5px solid #ff4b4b; }
+    .contact-card { background-color: #1e2130; padding: 20px; border-radius: 10px; border-left: 5px solid #ff4b4b; margin-top: 20px;}
+    .home-header { background: linear-gradient(90deg, #ff4b4b, #1e2130); padding: 2px; border-radius: 10px; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -80,34 +81,55 @@ def process_frame(frame):
     return frame
 
 # Persistent frame storage for snapshot
-if "last_frame" not in st.session_state:
-    st.session_state["last_frame"] = None
+if "current_image" not in st.session_state:
+    st.session_state["current_image"] = None
 
 def callback(frame):
     img = frame.to_ndarray(format="bgr24")
     processed = process_frame(img)
-    st.session_state["last_frame"] = processed # Save for snapshot
+    # Thread-safe update
+    st.session_state["current_image"] = processed
     return av.VideoFrame.from_ndarray(processed, format="bgr24")
 
-tab_home, tab_live, tab_upload, tab_contact = st.tabs(["🏠 Info", "🎥 Live Camera", "📤 Upload", "📧 Contact"])
+tab_home, tab_live, tab_upload = st.tabs(["🏠 Home & Contact", "🎥 Live Camera", "📤 Upload"])
 
 with tab_home:
     col1, col2 = st.columns([1, 2])
     with col1:
         st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=120)
     with col2:
-        st.subheader("Emotion AI System")
+        st.subheader("System Overview")
         st.markdown("""
-        **System Capabilities:**
         - Optimized for **Group Analysis**.
         - High-contrast visual labeling.
-        - Dynamic image rescaling.
-        - **Live Snapshots** enabled.
+        - **Live Snapshots** & Image Upload support.
         """)
+    
+    # --- Contact Section Moved to Home ---
+    st.markdown('<div class="contact-card">', unsafe_allow_html=True)
+    st.subheader("📬 Contact & Feedback")
+    st.write("Encountered an issue? Share your result or feedback to help me improve!")
+    
+    c1, c2, c3 = st.columns(3)
+    c1.markdown("[🔗 LinkedIn](https://www.linkedin.com/in/pritam-kumar-607631334)")
+    c2.markdown("[📸 Instagram](https://www.instagram.com/pritamray26)")
+    c3.markdown("[📧 Email](mailto:pritamray6200@gmail.com)")
+    
+    st.markdown("---")
+    with st.form("feedback_home", clear_on_submit=True):
+        f_email = st.text_input("Email")
+        f_msg = st.text_area("Message")
+        spam = st.number_input("Spam Check: 5 + 7 = ?", min_value=0)
+        if st.form_submit_button("Send"):
+            if spam == 12 and f_email and f_msg:
+                st.success("Feedback received!")
+            else:
+                st.error("Invalid entry.")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 with tab_live:
     ctx = webrtc_streamer(
-        key="emotion-ai-snapshot",
+        key="emotion-final-v4",
         mode=WebRtcMode.SENDRECV,
         video_frame_callback=callback,
         rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
@@ -115,52 +137,25 @@ with tab_live:
         async_processing=True,
     )
 
-    # --- Feature 1: Live Snapshot ---
-    if ctx.state.playing and st.button("📸 Capture Live Result"):
-        if st.session_state["last_frame"] is not None:
-            snapshot = st.session_state["last_frame"]
-            st.image(cv2.cvtColor(snapshot, cv2.COLOR_BGR2RGB), caption="Captured Result", use_column_width=True)
-            _, snap_encoded = cv2.imencode('.jpg', snapshot)
-            st.download_button("📥 Download Snapshot", data=snap_encoded.tobytes(), file_name=f"snap_{datetime.now().strftime('%H%M%S')}.jpg")
-        else:
-            st.warning("Please wait for the camera to initialize.")
+    # --- Fixed Live Snapshot Logic ---
+    if ctx.state.playing:
+        if st.button("📸 Capture Live Result"):
+            snap = st.session_state.get("current_image")
+            if snap is not None:
+                st.image(cv2.cvtColor(snap, cv2.COLOR_BGR2RGB), caption="Snapshot Result", use_column_width=True)
+                _, enc = cv2.imencode('.jpg', snap)
+                st.download_button("📥 Download Snapshot", data=enc.tobytes(), file_name=f"live_{datetime.now().strftime('%H%M%S')}.jpg")
+            else:
+                st.info("Processing first frame... please try again in a second.")
 
 with tab_upload:
     file = st.file_uploader("Upload Image", type=['jpg', 'png', 'jpeg'])
     if file:
         file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
         img = cv2.imdecode(file_bytes, 1)
-        with st.spinner('Performing Deep Analysis...'):
+        with st.spinner('Analyzing...'):
             processed_img = process_frame(img)
             st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_column_width=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             _, img_encoded = cv2.imencode('.jpg', processed_img)
-            st.download_button("📥 Download Analysis", data=img_encoded.tobytes(), file_name=f"emotion_{timestamp}.jpg", mime="image/jpeg")
-
-with tab_contact:
-    st.markdown('<div class="contact-card">', unsafe_allow_html=True)
-    st.subheader("Get in Touch")
-    st.write("If you encounter any issues or have suggestions to improve this system, please feel free to reach out. Sharing your results or feedback helps me refine the model further!")
-    
-    col_a, col_b, col_c = st.columns(3)
-    col_a.markdown("[🔗 LinkedIn](https://www.linkedin.com/in/pritam-kumar-607631334)")
-    col_b.markdown("[📸 Instagram](https://www.instagram.com/pritamray26)")
-    col_c.markdown("[📧 Email](mailto:pritamray6200@gmail.com)")
-    
-    st.markdown("---")
-    
-    # --- Protected Feedback System ---
-    st.subheader("Submit Feedback")
-    with st.form("feedback_form", clear_on_submit=True):
-        user_email = st.text_input("Your Email (for verification)")
-        feedback_msg = st.text_area("Message")
-        # Anti-spam: Simple math challenge
-        spam_check = st.number_input("Spam Protection: What is 5 + 7?", min_value=0)
-        
-        submit_fb = st.form_submit_button("Send Feedback")
-        if submit_fb:
-            if spam_check == 12 and user_email and feedback_msg:
-                st.success("Thank you! Your feedback has been logged. I will review it shortly.")
-            else:
-                st.error("Please fill all fields correctly and solve the spam protection challenge.")
-    st.markdown('</div>', unsafe_allow_html=True)
+            st.download_button("📥 Download Analysis", data=img_encoded.tobytes(), file_name=f"emotion_{ts}.jpg", mime="image/jpeg")
