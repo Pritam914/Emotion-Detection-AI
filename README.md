@@ -2,10 +2,28 @@
   <h1>🎭 Real-Time Emotion Recognition AI</h1>
   <p><i>Developed with passion by <b>Pritam Kumar</b></i></p>
   
-  <a href="https://emotion-detection-ai-nwfybvjapxbs5jhbtpd4cy.streamlit.app">
-    <img src="https://static.streamlit.io/badges/streamlit_badge_svg.svg" alt="Streamlit App">
+  <br>
+  <a href="https://emotion-detection-ai-nwfybvjapxbs5jhbtpd4cy.streamlit.app" style="text-decoration: none;">
+    <div style="
+      display: inline-block;
+      padding: 15px 40px;
+      font-size: 20px;
+      font-family: 'Courier New', Courier, monospace;
+      font-weight: bold;
+      color: #ffffff;
+      background-color: #1e2130;
+      border: 2px solid #ff4b4b;
+      border-radius: 10px;
+      box-shadow: 0 8px #ff4b4b;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+      letter-spacing: 2px;">
+      [ CLICK TO PREVIEW THE SYSTEM ]
+    </div>
   </a>
-  <br><br>
+  <p style="margin-top: 20px; color: #888;"><i>Best experienced on Desktop & Mobile</i></p>
+  <br>
   <strong>A high-fidelity Deep Learning application optimized for real-time and group facial analysis.</strong>
 </div>
 
@@ -22,26 +40,32 @@
 
 <h2 id="showcase">📸 Project Showcase</h2>
 <p align="center">
-  <table width="100%">
+  <table width="100%" style="border-collapse: collapse;">
     <tr>
-      <td width="33%" align="center">
-        <b>Real-Time Live Feed</b><br>
-        <img src="https://via.placeholder.com/400x250?text=Live+Result+Screenshot" width="100%" alt="Live Result">
+      <td width="33%" align="center" style="padding: 10px;">
+        <div style="border: 1px solid #333; border-radius: 10px; padding: 10px; background: #161b22;">
+          <b>Real-Time Live Feed</b><br><br>
+          <img src="https://via.placeholder.com/400x250?text=Live+Result+Screenshot" width="100%" style="border-radius: 5px;" alt="Live Result">
+        </div>
       </td>
-      <td width="33%" align="center">
-        <b>Group Photo Analysis</b><br>
-        <img src="https://via.placeholder.com/400x250?text=Group+Result+Screenshot" width="100%" alt="Group Result">
+      <td width="33%" align="center" style="padding: 10px;">
+        <div style="border: 1px solid #333; border-radius: 10px; padding: 10px; background: #161b22;">
+          <b>Group Photo Analysis</b><br><br>
+          <img src="https://via.placeholder.com/400x250?text=Group+Result+Screenshot" width="100%" style="border-radius: 5px;" alt="Group Result">
+        </div>
       </td>
-      <td width="33%" align="center">
-        <b>High-Res Uploads</b><br>
-        <img src="https://via.placeholder.com/400x250?text=Upload+Result+Screenshot" width="100%" alt="Upload Result">
+      <td width="33%" align="center" style="padding: 10px;">
+        <div style="border: 1px solid #333; border-radius: 10px; padding: 10px; background: #161b22;">
+          <b>High-Res Uploads</b><br><br>
+          <img src="https://via.placeholder.com/400x250?text=Upload+Result+Screenshot" width="100%" style="border-radius: 5px;" alt="Upload Result">
+        </div>
       </td>
     </tr>
   </table>
 </p>
 
 <blockquote>
-  <b>💡 Note:</b> To showcase your real work, replace the placeholder links above with your actual result images stored in your repository.
+  <b>💡 Note:</b> Replace the placeholder images above with real screenshots from your app to showcase your actual engineering work.
 </blockquote>
 
 <hr>
@@ -50,16 +74,20 @@
 <ul>
   <li><b>Adaptive Rescaling:</b> Automatically handles high-resolution images to prevent OpenCV memory crashes (Fixed <code>scaleIdx</code> assertion errors).</li>
   <li><b>Contrast Enhancement (CLAHE):</b> Integrated Contrast Limited Adaptive Histogram Equalization for accurate detection in low-light and complex group settings.</li>
-  <li><b>Temporal Stability:</b> Optimized for low-latency inference on both Mobile and Desktop browsers via Streamlit-WebRTC.</li>
-  <li><b>Multi-Face Support:</b> Specifically fine-tuned to detect up to 15 faces in a single frame.</li>
+  <li><b>Temporal Stability:</b> Optimized for low-latency inference via Streamlit-WebRTC.</li>
+  <li><b>Multi-Face Support:</b> Fine-tuned to detect up to 15 faces in a single frame.</li>
 </ul>
 
 <hr>
 
 <h2 id="technical-stack">🛠️ Technical Stack</h2>
-<table>
+
+
+[Image of Convolutional Neural Network architecture]
+
+<table width="100%">
   <tr>
-    <td><b>Deep Learning</b></td>
+    <td width="30%"><b>Deep Learning</b></td>
     <td>TensorFlow, Keras (CNN Architecture), FER2013 Dataset</td>
   </tr>
   <tr>
