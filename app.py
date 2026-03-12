@@ -24,17 +24,15 @@ class PatchedDense(keras.layers.Dense):
 # --- UI Styling ---
 st.set_page_config(page_title="Emotion AI | Pritam", layout="centered")
 
-# Custom CSS for Professional Look & Mobile Optimization
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; }
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; justify-content: center; }
+    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
     .stTabs [data-baseweb="tab"] {
-        height: 50px; background-color: #1e2130; 
-        border-radius: 10px; color: white; padding: 10px 20px;
+        height: 45px; background-color: #1e2130; 
+        border-radius: 8px; color: white; font-size: 14px;
     }
     .stTabs [aria-selected="true"] { background-color: #ff4b4b !important; }
-    div[data-testid="stSidebarNav"] { display: none; } /* Hide default sidebar */
+    div[data-testid="stSidebarNav"] { display: none; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -49,14 +47,16 @@ def setup_resources():
 model, face_cascade = setup_resources()
 emotion_labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
 
-# --- Process Logic with Enhanced Visibility ---
-def process_emotion(frame, is_mobile=True):
-    # Thick lines and big fonts for mobile visibility
-    thickness = 4 if is_mobile else 2
-    font_scale = 1.5 if is_mobile else 0.8
+# --- Robust Process Logic ---
+def process_emotion(frame):
+    # Image resize to prevent OpenCV ScaleData error
+    h, w = frame.shape[:2]
+    if w > 1000: # Agar image bohot badi hai toh resize karo
+        frame = cv2.resize(frame, (800, int(h * 800 / w)))
     
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+    # faces detection with safer parameters
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
     
     for (x, y, w, h) in faces:
         fc = gray[y:y+h, x:x+w]
@@ -66,62 +66,56 @@ def process_emotion(frame, is_mobile=True):
         prediction = model.predict(roi, verbose=0)
         label = emotion_labels[np.argmax(prediction)]
         
-        # Bolder Rectangle & Text
-        cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), thickness)
-        cv2.putText(frame, label, (x, y-15), cv2.FONT_HERSHEY_SIMPLEX, 
-                    font_scale, (255, 255, 255), thickness)
+        # Super-Visible styling for Mobile
+        cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 3)
+        cv2.putText(frame, label, (x, y-15), cv2.FONT_HERSHEY_DUPLEX, 
+                    1.2, (255, 255, 255), 3)
         
     return frame
 
 def callback(frame):
     img = frame.to_ndarray(format="bgr24")
-    processed = process_emotion(img, is_mobile=True)
+    processed = process_emotion(img)
     return av.VideoFrame.from_ndarray(processed, format="bgr24")
 
-# --- Mobile-Friendly Navigation ---
-tab_home, tab_live, tab_upload = st.tabs(["🏠 Home", "🎥 Live Camera", "📤 Upload"])
+# --- Tabs Navigation ---
+tab_home, tab_live, tab_upload = st.tabs(["🏠 Home", "🎥 Live AI", "📤 Upload"])
 
 with tab_home:
-    st.markdown("""
-    ### Welcome to Emotion AI
-    This professional tool analyzes facial expressions using Deep Learning (CNN).
-    
-    **Features:**
-    - Real-time detection via WebRTC.
-    - Snapshot capture during live feed.
-    - High-visibility detection for mobile screens.
-    """)
-    st.image("https://img.icons8.com/clouds/200/000000/brainstorming.png")
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        # Reliable Placeholder Image
+        st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=150)
+    with col2:
+        st.subheader("Project Overview")
+        st.write("Developed by **Pritam Kumar**")
+        st.markdown("""
+        - **Model:** CNN (Convolutional Neural Network)
+        - **Dataset:** FER2013
+        - **Tech:** TensorFlow, OpenCV, Streamlit
+        """)
 
 with tab_live:
-    st.info("Ensure you are using HTTPS for camera access.")
-    # Connection Pool
-    RTC_CONFIG = RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]})
-    
-    ctx = webrtc_streamer(
-        key="emotion-pro",
+    st.info("Mobile users: Use Landscape mode for better view.")
+    webrtc_streamer(
+        key="emotion-pro-final",
         mode=WebRtcMode.SENDRECV,
-        rtc_configuration=RTC_CONFIG,
         video_frame_callback=callback,
+        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
         media_stream_constraints={"video": True, "audio": False},
         async_processing=True,
     )
-    
-    if ctx.state.playing:
-        if st.button("📸 Click to Capture Snapshot"):
-            st.warning("Snapshot saved below (Download enabled)")
-            # This logic captures the current state if needed
 
 with tab_upload:
-    st.write("### Image Analysis")
-    file = st.file_uploader("Choose a photo...", type=['jpg', 'png', 'jpeg'])
+    file = st.file_uploader("Upload Image", type=['jpg', 'png', 'jpeg'])
     if file:
         file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
         img = cv2.imdecode(file_bytes, 1)
-        # Apply Enhanced Visibility logic
-        processed_img = process_emotion(img, is_mobile=True)
-        st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_column_width=True)
         
-        # Download Button
-        result_img = Image.fromarray(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB))
-        st.download_button("📥 Download Result", data=file, file_name="result.jpg")
+        with st.spinner('Analyzing Emotion...'):
+            processed_img = process_emotion(img)
+            st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_container_width=True)
+            
+            # Download result
+            _, img_encoded = cv2.imencode('.jpg', processed_img)
+            st.download_button("📥 Download Result", data=img_encoded.tobytes(), file_name="emotion_analysis.jpg")
