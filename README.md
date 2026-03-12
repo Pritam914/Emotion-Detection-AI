@@ -30,10 +30,9 @@
 <hr>
 
 <div align="center">
-  <a href="https://emotion-detection-ai-nwfybvjapxbs5jhbtpd4cy.streamlit.app">🚀 Live Demo</a> •
-  <a href="#key-features">🧠 Features</a> •
-  <a href="#technical-stack">🛠️ Tech Stack</a> •
-  <a href="#contact">📬 Contact</a>
+  <a href="https://www.linkedin.com/in/pritam-kumar-607631334?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app">🔗 LinkedIn</a> • 
+  <a href="https://www.instagram.com/pritamray26">📸 Instagram</a> • 
+  <a href="mailto:pritamray6200@gmail.com">📧 Email</a>
 </div>
 
 <hr>
@@ -64,10 +63,6 @@
   </table>
 </p>
 
-<blockquote>
-  <b>💡 Note:</b> Replace the placeholder images above with real screenshots from your app to showcase your actual engineering work.
-</blockquote>
-
 <hr>
 
 <h2 id="key-features">🧠 Key Engineering Features</h2>
@@ -81,9 +76,6 @@
 <hr>
 
 <h2 id="technical-stack">🛠️ Technical Stack</h2>
-
-
-[Image of Convolutional Neural Network architecture]
 
 <table width="100%">
   <tr>
