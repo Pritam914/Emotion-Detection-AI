@@ -33,8 +33,8 @@ st.markdown("""
     }
     .stTabs [aria-selected="true"] { background-color: #ff4b4b !important; }
     div[data-testid="stSidebarNav"] { display: none; }
-    .contact-card { background-color: #1e2130; padding: 20px; border-radius: 10px; border-left: 5px solid #ff4b4b; margin-top: 20px;}
-    .home-header { background: linear-gradient(90deg, #ff4b4b, #1e2130); padding: 2px; border-radius: 10px; margin-bottom: 20px; }
+    .info-card { background-color: #1e2130; padding: 20px; border-radius: 15px; border-top: 4px solid #ff4b4b; margin-bottom: 20px;}
+    .feedback-section { background-color: #161b22; padding: 25px; border-radius: 15px; border: 1px solid #30363d; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -80,56 +80,40 @@ def process_frame(frame):
         
     return frame
 
-# Persistent frame storage for snapshot
-if "current_image" not in st.session_state:
-    st.session_state["current_image"] = None
+# Global buffer for Snapshot
+if "snapshot_buffer" not in st.session_state:
+    st.session_state["snapshot_buffer"] = None
 
 def callback(frame):
     img = frame.to_ndarray(format="bgr24")
     processed = process_frame(img)
-    # Thread-safe update
-    st.session_state["current_image"] = processed
+    st.session_state["snapshot_buffer"] = processed
     return av.VideoFrame.from_ndarray(processed, format="bgr24")
 
-tab_home, tab_live, tab_upload = st.tabs(["🏠 Home & Contact", "🎥 Live Camera", "📤 Upload"])
+# --- Tabs Structure ---
+tab_home, tab_live, tab_upload, tab_feedback = st.tabs(["🏠 Home", "🎥 Live Camera", "📤 Upload", "💬 Feedback"])
 
 with tab_home:
+    st.markdown('<div class="info-card">', unsafe_allow_html=True)
     col1, col2 = st.columns([1, 2])
     with col1:
         st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=120)
     with col2:
-        st.subheader("System Overview")
-        st.markdown("""
-        - Optimized for **Group Analysis**.
-        - High-contrast visual labeling.
-        - **Live Snapshots** & Image Upload support.
-        """)
-    
-    # --- Contact Section Moved to Home ---
-    st.markdown('<div class="contact-card">', unsafe_allow_html=True)
-    st.subheader("📬 Contact & Feedback")
-    st.write("Encountered an issue? Share your result or feedback to help me improve!")
-    
-    c1, c2, c3 = st.columns(3)
-    c1.markdown("[🔗 LinkedIn](https://www.linkedin.com/in/pritam-kumar-607631334)")
-    c2.markdown("[📸 Instagram](https://www.instagram.com/pritamray26)")
-    c3.markdown("[📧 Email](mailto:pritamray6200@gmail.com)")
+        st.subheader("Pritam's Emotion AI")
+        st.write("This system uses a Deep Convolutional Neural Network (CNN) to interpret human micro-expressions in real-time.")
     
     st.markdown("---")
-    with st.form("feedback_home", clear_on_submit=True):
-        f_email = st.text_input("Email")
-        f_msg = st.text_area("Message")
-        spam = st.number_input("Spam Check: 5 + 7 = ?", min_value=0)
-        if st.form_submit_button("Send"):
-            if spam == 12 and f_email and f_msg:
-                st.success("Feedback received!")
-            else:
-                st.error("Invalid entry.")
+    st.subheader("System Capabilities")
+    st.markdown("""
+    - **Face Tracking:** Robust Haar-Cascade multi-face detection.
+    - **Express Inference:** Low-latency emotion classification (Angry, Happy, Neutral, Sad, Surprised).
+    - **Stability:** Dynamic rescaling and histogram equalization for varying light conditions.
+    """)
     st.markdown('</div>', unsafe_allow_html=True)
 
 with tab_live:
     ctx = webrtc_streamer(
-        key="emotion-final-v4",
+        key="emotion-ai-final-production",
         mode=WebRtcMode.SENDRECV,
         video_frame_callback=callback,
         rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
@@ -137,25 +121,51 @@ with tab_live:
         async_processing=True,
     )
 
-    # --- Fixed Live Snapshot Logic ---
     if ctx.state.playing:
-        if st.button("📸 Capture Live Result"):
-            snap = st.session_state.get("current_image")
+        st.markdown("---")
+        if st.button("📸 Capture & Review Results"):
+            snap = st.session_state.get("snapshot_buffer")
             if snap is not None:
-                st.image(cv2.cvtColor(snap, cv2.COLOR_BGR2RGB), caption="Snapshot Result", use_column_width=True)
+                st.image(cv2.cvtColor(snap, cv2.COLOR_BGR2RGB), caption="Analysis Result Captured", use_column_width=True)
                 _, enc = cv2.imencode('.jpg', snap)
-                st.download_button("📥 Download Snapshot", data=enc.tobytes(), file_name=f"live_{datetime.now().strftime('%H%M%S')}.jpg")
+                st.download_button("📥 Save to Device", data=enc.tobytes(), file_name=f"live_result_{datetime.now().strftime('%H%M%S')}.jpg")
             else:
-                st.info("Processing first frame... please try again in a second.")
+                st.warning("Syncing frames... Click again in 1 second.")
 
 with tab_upload:
-    file = st.file_uploader("Upload Image", type=['jpg', 'png', 'jpeg'])
+    file = st.file_uploader("Choose an image file", type=['jpg', 'png', 'jpeg'])
     if file:
         file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
         img = cv2.imdecode(file_bytes, 1)
-        with st.spinner('Analyzing...'):
+        with st.spinner('Analyzing expressions...'):
             processed_img = process_frame(img)
             st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_column_width=True)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             _, img_encoded = cv2.imencode('.jpg', processed_img)
-            st.download_button("📥 Download Analysis", data=img_encoded.tobytes(), file_name=f"emotion_{ts}.jpg", mime="image/jpeg")
+            st.download_button("📥 Download Analysis", data=img_encoded.tobytes(), file_name=f"emotion_{ts}.jpg")
+
+with tab_feedback:
+    st.markdown('<div class="feedback-section">', unsafe_allow_html=True)
+    st.subheader("📩 Community Feedback")
+    st.write("Your insights are vital for refining this AI. If you notice any misclassifications, please let me know!")
+    
+    # Contact Links
+    c1, c2, c3 = st.columns(3)
+    c1.markdown("[🔗 LinkedIn](https://www.linkedin.com/in/pritam-kumar-607631334)")
+    c2.markdown("[📸 Instagram](https://www.instagram.com/pritamray26)")
+    c3.markdown("[📧 Email](mailto:pritamray6200@gmail.com)")
+    
+    st.markdown("---")
+    with st.form("admin_feedback", clear_on_submit=True):
+        u_email = st.text_input("Verified Email Address")
+        u_msg = st.text_area("Observations or Suggestions")
+        u_spam = st.number_input("Human Check: 5 + 7 = ?", min_value=0)
+        
+        if st.form_submit_button("Submit Feedback"):
+            if u_spam == 12 and u_email and u_msg:
+                # ADMIN LOGGING: You will see this in your Streamlit Cloud logs
+                print(f"\n--- NEW FEEDBACK RECEIVED ---\nUser: {u_email}\nMessage: {u_msg}\nTimestamp: {datetime.now()}\n----------------------------")
+                st.success("Success! I have received your message in my logs. Thank you for contributing!")
+            else:
+                st.error("Please complete all fields correctly.")
+    st.markdown('</div>', unsafe_allow_html=True)
