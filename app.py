@@ -6,6 +6,7 @@ from tensorflow.keras.models import load_model
 from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration
 import av
 import os
+from datetime import datetime
 
 # Performance optimizations
 os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
@@ -46,7 +47,6 @@ def setup_resources():
 model, face_cascade = setup_resources()
 emotion_labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
 
-# Color Map (BGR)
 color_map = {
     0: (0, 0, 255),    # Red
     1: (0, 255, 0),    # Green
@@ -56,19 +56,29 @@ color_map = {
 }
 
 def process_frame(frame):
-    # --- Fix 1: Image Standardization to prevent OpenCV crashes ---
+    # Standardize size for stability
     h, w = frame.shape[:2]
-    if max(h, w) > 1000:
-        scale = 1000 / max(h, w)
+    if max(h, w) > 1200:
+        scale = 1200 / max(h, w)
         frame = cv2.resize(frame, (int(w * scale), int(h * scale)))
         h, w = frame.shape[:2]
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(gray, 1.1, 6, minSize=(60, 60))
     
-    # Responsive Font Settings
-    thickness = max(2, int(w / 400))
-    font_scale = max(0.7, w / 700)
+    # --- Fix 2: Group Photo Optimization ---
+    # Equalizing histogram improves detection in varying lighting conditions
+    gray = cv2.equalizeHist(gray)
+    
+    # Reduced scaleFactor and minNeighbors for better small face detection in groups
+    faces = face_cascade.detectMultiScale(
+        gray, 
+        scaleFactor=1.05, 
+        minNeighbors=4, 
+        minSize=(40, 40)
+    )
+    
+    thickness = max(2, int(w / 450))
+    font_scale = max(0.6, w / 800)
     
     for (x, y, fw, fh) in faces:
         roi = gray[y:y+fh, x:x+fw]
@@ -80,14 +90,11 @@ def process_frame(frame):
         label = emotion_labels[idx]
         color = color_map[idx]
         
-        text_y = y - 15 if y - 15 > 30 else y + fh + 40
+        text_y = y - 15 if y - 15 > 30 else y + fh + 35
         
-        # --- Fix 2: High-Contrast Text (Outline/Shadow) ---
-        # Draw black outline first for visibility
+        # High-Contrast Outline Text
         cv2.putText(frame, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, (0, 0, 0), thickness + 2)
-        # Draw actual colored text over it
         cv2.putText(frame, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, color, thickness)
-        
         cv2.rectangle(frame, (x, y), (x+fw, y+fh), color, thickness)
         
     return frame
@@ -106,16 +113,16 @@ with tab_home:
     with col2:
         st.subheader("Emotion AI System")
         st.markdown("""
-        **Features:**
-        - Live facial expression analysis.
-        - Support for high-resolution photo uploads.
-        - Multi-face detection capability.
-        - Color-coded results for better UX.
+        **System Capabilities:**
+        - Optimized for **Group Analysis**.
+        - High-contrast visual labeling.
+        - Dynamic image rescaling.
+        - Unique session-based reporting.
         """)
 
 with tab_live:
     webrtc_streamer(
-        key="emotion-ai-v3",
+        key="emotion-ai-final",
         mode=WebRtcMode.SENDRECV,
         video_frame_callback=callback,
         rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
@@ -131,10 +138,14 @@ with tab_upload:
     if file:
         file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
         img = cv2.imdecode(file_bytes, 1)
-        with st.spinner('Analyzing...'):
+        with st.spinner('Performing Deep Analysis...'):
             processed_img = process_frame(img)
             st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_column_width=True)
             
+            # --- Fix 1: Unique Timestamped Filename ---
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            unique_name = f"emotion_{timestamp}.jpg"
+            
             _, img_encoded = cv2.imencode('.jpg', processed_img)
             st.download_button("📥 Download Analysis", data=img_encoded.tobytes(), 
-                               file_name="emotion_result.jpg", mime="image/jpeg")
+                               file_name=unique_name, mime="image/jpeg")
