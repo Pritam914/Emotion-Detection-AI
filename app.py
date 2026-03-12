@@ -50,22 +50,24 @@ emotion_labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"
 color_map = {0: (0, 0, 255), 1: (0, 255, 0), 2: (255, 255, 255), 3: (255, 0, 0), 4: (0, 255, 255)}
 
 def process_frame(frame):
-    # CRASH FIX: Standardize image size for all inputs
+    # CRASH FIX & SCALE: Increased allowed dimension for group details
     h, w = frame.shape[:2]
-    if max(h, w) > 1000:
-        scale = 1000 / max(h, w)
+    if max(h, w) > 1200:
+        scale = 1200 / max(h, w)
         frame = cv2.resize(frame, (int(w * scale), int(h * scale)))
         h, w = frame.shape[:2]
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    gray = cv2.equalizeHist(gray) # Better detection in group lighting
     
-    # STABILITY FIX: High scaleFactor (1.15) prevents OpenCV scaleIdx assertion errors
-    # Higher minNeighbors (7) reduces false positives in background
-    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.15, minNeighbors=7, minSize=(50, 50))
+    # GROUP OPTIMIZATION: Balances shadows and highlights for group photos
+    gray = cv2.equalizeHist(gray) 
     
-    thickness = max(2, int(w / 450))
-    font_scale = max(0.6, w / 800)
+    # ACCURACY FIX: Lower scaleFactor (1.05) scans more layers for small faces
+    # Lower minNeighbors (3) allows detection of partially visible faces in crowd
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.05, minNeighbors=3, minSize=(30, 30))
+    
+    thickness = max(2, int(w / 600))
+    font_scale = max(0.5, w / 1000)
     
     for (x, y, fw, fh) in faces:
         roi = gray[y:y+fh, x:x+fw]
@@ -77,8 +79,10 @@ def process_frame(frame):
         label = emotion_labels[idx]
         color = color_map[idx]
         
-        text_y = y - 15 if y - 15 > 30 else y + fh + 35
-        # High-Contrast Outline
+        # UI FIX: Moves label below box if near top edge to prevent cutting
+        text_y = y - 10 if y - 10 > 25 else y + fh + 30
+        
+        # High-Contrast Labels
         cv2.putText(frame, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, (0, 0, 0), thickness + 2)
         cv2.putText(frame, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, color, thickness)
         cv2.rectangle(frame, (x, y), (x+fw, y+fh), color, thickness)
@@ -105,14 +109,14 @@ with tab_home:
     st.markdown("---")
     st.subheader("System Overview")
     st.markdown("""
-    - **Face Tracking:** Robust Haar-Cascade multi-face detection.
+    - **Face Tracking:** Robust Haar-Cascade multi-face detection (Optimized for Groups).
     - **Express Inference:** Real-time classification (Angry, Happy, Neutral, Sad, Surprised).
-    - **Stability:** Dynamic rescaling and histogram equalization for group photos.
+    - **Stability:** Histogram equalization for inconsistent lighting environments.
     """)
     
     st.markdown("---")
     st.subheader("📬 Contact & Feedback")
-    st.write("If you encounter any issues or have suggestions, feel free to reach out. Sharing your results or feedback helps me improve!")
+    st.write("Encountered an issue or have suggestions? Sharing your results helps me improve!")
     
     c1, c2, c3 = st.columns(3)
     c1.markdown("[🔗 LinkedIn](https://www.linkedin.com/in/pritam-kumar-607631334)")
@@ -121,9 +125,9 @@ with tab_home:
     st.markdown('</div>', unsafe_allow_html=True)
 
 with tab_live:
-    st.info("Ensure camera permissions are allowed. Best used in well-lit conditions.")
+    st.info("Best used in well-lit conditions. Ensure camera access is granted.")
     webrtc_streamer(
-        key="emotion-live-v7",
+        key="emotion-group-pro",
         mode=WebRtcMode.SENDRECV,
         rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
         video_frame_callback=callback,
@@ -136,9 +140,9 @@ with tab_upload:
     if file:
         file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
         img = cv2.imdecode(file_bytes, 1)
-        with st.spinner('Analyzing...'):
+        with st.spinner('Scanning all faces...'):
             processed_img = process_frame(img)
             st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_column_width=True)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             _, img_encoded = cv2.imencode('.jpg', processed_img)
-            st.download_button("📥 Download Analysis", data=img_encoded.tobytes(), file_name=f"emotion_{ts}.jpg")
+            st.download_button("📥 Download Analysis", data=img_encoded.tobytes(), file_name=f"emotion_analysis_{ts}.jpg")
