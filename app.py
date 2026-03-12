@@ -8,11 +8,11 @@ import av
 import os
 from collections import deque
 
-# System optimization
+# System optimization for faster inference
 os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
 cv2.setNumThreads(0)
 
-# Keras Patch for legacy .h5 files
+# Keras Patch
 import keras
 @keras.saving.register_keras_serializable(package="Custom")
 class PatchedDense(keras.layers.Dense):
@@ -21,9 +21,9 @@ class PatchedDense(keras.layers.Dense):
         kwargs.pop('optional', None)
         super().__init__(**kwargs)
 
-# UI Styling
 st.set_page_config(page_title="Emotion AI | Pritam", layout="centered")
 
+# Professional UI Styling
 st.markdown("""
     <style>
     .stTabs [data-baseweb="tab-list"] { gap: 5px; display: flex; overflow-x: auto; }
@@ -45,16 +45,29 @@ def setup_resources():
     return model, cascade
 
 model, face_cascade = setup_resources()
-emotion_labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
 
-# Buffer for temporal smoothing (Stabilizes fluctuations)
+# Color Coding for Emotions (BGR Format)
+# Happy: Green | Sad: Blue | Angry: Red | Surprised: Yellow | Neutral: White
+emotion_labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
+color_map = {
+    0: (0, 0, 255),    # Red
+    1: (0, 255, 0),    # Green
+    2: (255, 255, 255),# White
+    3: (255, 0, 0),    # Blue
+    4: (0, 255, 255)   # Yellow
+}
+
 if 'emotion_buffer' not in st.session_state:
     st.session_state.emotion_buffer = deque(maxlen=5)
 
 def process_emotion(frame, smoothing=False):
     h, w = frame.shape[:2]
+    # Dynamic scaling for fonts
+    font_scale = max(1.2, w / 400.0) 
+    thickness = max(3, int(w / 200.0))
+    
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+    faces = face_cascade.detectMultiScale(gray, 1.1, 5, minSize=(40, 40))
     
     for (x, y, fw, fh) in faces:
         fc = gray[y:y+fh, x:x+fw]
@@ -65,22 +78,26 @@ def process_emotion(frame, smoothing=False):
         
         if smoothing:
             st.session_state.emotion_buffer.append(prediction)
-            avg_prediction = np.mean(st.session_state.emotion_buffer, axis=0)
-            label_idx = np.argmax(avg_prediction)
+            avg_pred = np.mean(st.session_state.emotion_buffer, axis=0)
+            idx = np.argmax(avg_pred)
         else:
-            label_idx = np.argmax(prediction)
+            idx = np.argmax(prediction)
             
-        label = emotion_labels[label_idx]
+        label = emotion_labels[idx]
+        color = color_map[idx]
         
-        # UI visibility logic (prevents label cutting)
-        text_y = y - 20 if y - 20 > 40 else y + fh + 40
-        cv2.rectangle(frame, (x, y), (x+fw, y+fh), (0, 255, 0), 4)
-        cv2.putText(frame, label, (x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 4)
+        # Prevent label clipping
+        text_y = y - 20 if y - 20 > 50 else y + fh + 60
+        
+        cv2.rectangle(frame, (x, y), (x+fw, y+fh), color, thickness)
+        # Background for text for better readability
+        cv2.putText(frame, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, color, thickness)
         
     return frame
 
 def callback(frame):
     img = frame.to_ndarray(format="bgr24")
+    # Using lightweight processing for Live
     processed = process_emotion(img, smoothing=True)
     return av.VideoFrame.from_ndarray(processed, format="bgr24")
 
@@ -93,20 +110,28 @@ with tab_home:
     with col2:
         st.subheader("Developer: Pritam")
         st.write("Specialization: CSE (AIML)")
-        st.write("System: Real-time Emotion Analysis")
+        st.write("Real-time Facial Emotion Analysis via Deep Learning.")
 
 with tab_live:
-    # Direct Camera Access Configuration
+    # Multiple STUN servers pool to bypass firewall/NAT issues
+    # 
     webrtc_streamer(
-        key="emotion-direct-access",
+        key="emotion-ai-optimized",
         mode=WebRtcMode.SENDRECV,
         video_frame_callback=callback,
-        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+        rtc_configuration={
+            "iceServers": [
+                {"urls": ["stun:stun.l.google.com:19302"]},
+                {"urls": ["stun:stun1.l.google.com:19302"]},
+                {"urls": ["stun:stun2.l.google.com:19302"]}
+            ]
+        },
         media_stream_constraints={
             "video": {
                 "facingMode": "user",
-                "width": {"ideal": 1280},
-                "height": {"ideal": 720}
+                "width": {"ideal": 640}, # Reduced resolution for stability on mobile
+                "height": {"ideal": 480},
+                "frameRate": {"ideal": 20}
             },
             "audio": False
         },
@@ -123,5 +148,5 @@ with tab_upload:
             st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_column_width=True)
             
             _, img_encoded = cv2.imencode('.jpg', processed_img)
-            st.download_button("📥 Download Result Image", data=img_encoded.tobytes(), 
-                               file_name="emotion_detected.jpg", mime="image/jpeg")
+            st.download_button("📥 Download Result", data=img_encoded.tobytes(), 
+                               file_name="detected_emotion.jpg", mime="image/jpeg")
