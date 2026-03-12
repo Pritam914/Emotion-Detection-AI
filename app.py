@@ -8,11 +8,11 @@ import av
 import os
 from PIL import Image
 
-# Optimization
+# System optimization
 os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
 cv2.setNumThreads(0)
 
-# Keras Patch
+# Keras Patch for legacy .h5 files
 import keras
 @keras.saving.register_keras_serializable(package="Custom")
 class PatchedDense(keras.layers.Dense):
@@ -21,15 +21,24 @@ class PatchedDense(keras.layers.Dense):
         kwargs.pop('optional', None)
         super().__init__(**kwargs)
 
-# --- UI Styling ---
+# --- UI Styling (Fixed for Mobile Tabs) ---
 st.set_page_config(page_title="Emotion AI | Pritam", layout="centered")
 
 st.markdown("""
     <style>
-    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
+    /* Fix for full text in tabs on mobile */
+    .stTabs [data-baseweb="tab-list"] { 
+        gap: 5px; 
+        display: flex;
+        overflow-x: auto;
+    }
     .stTabs [data-baseweb="tab"] {
-        height: 45px; background-color: #1e2130; 
-        border-radius: 8px; color: white; font-size: 14px;
+        background-color: #1e2130; 
+        border-radius: 5px; 
+        color: white; 
+        padding: 8px 12px;
+        white-space: nowrap; /* Prevent text cutting */
+        min-width: 100px;
     }
     .stTabs [aria-selected="true"] { background-color: #ff4b4b !important; }
     div[data-testid="stSidebarNav"] { display: none; }
@@ -47,15 +56,14 @@ def setup_resources():
 model, face_cascade = setup_resources()
 emotion_labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
 
-# --- Robust Process Logic ---
+# --- Process Logic (Optimized) ---
 def process_emotion(frame):
-    # Image resize to prevent OpenCV ScaleData error
     h, w = frame.shape[:2]
-    if w > 1000: # Agar image bohot badi hai toh resize karo
+    if w > 1000:
         frame = cv2.resize(frame, (800, int(h * 800 / w)))
     
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    # faces detection with safer parameters
+    # scaleFactor changed to 1.1 to avoid ScaleData error
     faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
     
     for (x, y, w, h) in faces:
@@ -66,10 +74,10 @@ def process_emotion(frame):
         prediction = model.predict(roi, verbose=0)
         label = emotion_labels[np.argmax(prediction)]
         
-        # Super-Visible styling for Mobile
-        cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 3)
-        cv2.putText(frame, label, (x, y-15), cv2.FONT_HERSHEY_DUPLEX, 
-                    1.2, (255, 255, 255), 3)
+        # Thicker lines and bigger font for Android
+        cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 4)
+        cv2.putText(frame, label, (x, y-20), cv2.FONT_HERSHEY_SIMPLEX, 
+                    1.5, (255, 255, 255), 4)
         
     return frame
 
@@ -79,26 +87,21 @@ def callback(frame):
     return av.VideoFrame.from_ndarray(processed, format="bgr24")
 
 # --- Tabs Navigation ---
-tab_home, tab_live, tab_upload = st.tabs(["🏠 Home", "🎥 Live AI", "📤 Upload"])
+tab_home, tab_live, tab_upload = st.tabs(["🏠 Home Info", "🎥 Live Detect", "📤 Upload Img"])
 
 with tab_home:
     col1, col2 = st.columns([1, 2])
     with col1:
-        # Reliable Placeholder Image
-        st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=150)
+        st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=120)
     with col2:
-        st.subheader("Project Overview")
-        st.write("Developed by **Pritam Kumar**")
-        st.markdown("""
-        - **Model:** CNN (Convolutional Neural Network)
-        - **Dataset:** FER2013
-        - **Tech:** TensorFlow, OpenCV, Streamlit
-        """)
+        st.subheader("Developer: Pritam")
+        st.write("Specialization: CSE (AIML)")
+        st.write("Tech: CNN + OpenCV + WebRTC")
 
 with tab_live:
-    st.info("Mobile users: Use Landscape mode for better view.")
+    st.info("Mobile: Landscape mode try karein.")
     webrtc_streamer(
-        key="emotion-pro-final",
+        key="emotion-live-final",
         mode=WebRtcMode.SENDRECV,
         video_frame_callback=callback,
         rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
@@ -112,10 +115,16 @@ with tab_upload:
         file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
         img = cv2.imdecode(file_bytes, 1)
         
-        with st.spinner('Analyzing Emotion...'):
+        with st.spinner('Analyzing...'):
             processed_img = process_emotion(img)
-            st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_container_width=True)
+            # Fix: replaced use_container_width with use_column_width for compatibility
+            st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_column_width=True)
             
-            # Download result
+            # --- FIXED DOWNLOAD LOGIC ---
             _, img_encoded = cv2.imencode('.jpg', processed_img)
-            st.download_button("📥 Download Result", data=img_encoded.tobytes(), file_name="emotion_analysis.jpg")
+            st.download_button(
+                label="📥 Download Result Image", 
+                data=img_encoded.tobytes(), 
+                file_name="detected_emotion.jpg",
+                mime="image/jpeg"
+            )
