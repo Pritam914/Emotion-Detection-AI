@@ -8,7 +8,7 @@ import av
 import os
 from datetime import datetime
 
-# Optimization
+# Performance optimizations
 os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
 cv2.setNumThreads(0)
 
@@ -23,7 +23,7 @@ class PatchedDense(keras.layers.Dense):
 
 st.set_page_config(page_title="Emotion AI | Pritam", layout="centered")
 
-# --- UI Styling (Professional Dark Theme) ---
+# --- UI Styling ---
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; }
@@ -41,7 +41,6 @@ st.title("🎭 Real-Time Emotion Recognition")
 
 @st.cache_resource
 def setup_resources():
-    # Load model and XML
     model = load_model("emotion_detection.h5", custom_objects={"Dense": PatchedDense}, compile=False)
     cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
     return model, cascade
@@ -50,28 +49,27 @@ model, face_cascade = setup_resources()
 emotion_labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
 color_map = {0: (0, 0, 255), 1: (0, 255, 0), 2: (255, 255, 255), 3: (255, 0, 0), 4: (0, 255, 255)}
 
-# --- Core Logic with Stability Buffers ---
+# --- Speed-Optimized Logic ---
 def process_emotion(image):
-    # Resize for stability if image is too large
+    # STEP 1: Strict Resize for Speed (Prevents analysis freeze)
     h, w = image.shape[:2]
-    if max(h, w) > 1000:
-        scale = 1000 / max(h, w)
+    max_side = 800 # Optimized for Streamlit Cloud
+    if max(h, w) > max_side:
+        scale = max_side / max(h, w)
         image = cv2.resize(image, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
         h, w = image.shape[:2]
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    # Contrast improvement for better accuracy
     gray = cv2.equalizeHist(gray)
     
-    # Face detection with robust parameters
+    # STEP 2: Faster Face Detection
     faces = face_cascade.detectMultiScale(
         gray, 
-        scaleFactor=1.1, 
-        minNeighbors=6, 
-        minSize=(40, 40)
+        scaleFactor=1.2, # Scans fewer windows for faster results
+        minNeighbors=5, 
+        minSize=(50, 50)
     )
     
-    # Limitation for server stability
     if len(faces) > 12:
         return "limit", len(faces)
     
@@ -80,16 +78,16 @@ def process_emotion(image):
         roi_gray = cv2.resize(roi_gray, (48, 48)) / 255.0
         roi_gray = np.reshape(roi_gray, (1, 48, 48, 1))
         
+        # Fast Inference
         prediction = model.predict(roi_gray, verbose=0)
         idx = np.argmax(prediction)
         label = emotion_labels[idx]
         color = color_map[idx]
         
-        # UI Scaling
-        thickness = max(2, int(w / 400))
-        font_scale = max(0.6, w / 800)
+        # Scaling labels
+        thickness = max(2, int(w / 450))
+        font_scale = max(0.5, w / 900)
         
-        # Shadow Text Logic (for visibility on all backgrounds)
         text_y = y - 10 if y - 10 > 25 else y + fh + 30
         cv2.putText(image, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, (0, 0, 0), thickness + 2)
         cv2.putText(image, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, color, thickness)
@@ -100,25 +98,23 @@ def process_emotion(image):
 def callback(frame):
     img = frame.to_ndarray(format="bgr24")
     res = process_emotion(img)
-    if isinstance(res, tuple):
-        processed_img = res[0]
-    else:
-        processed_img = img
+    processed_img = res[0] if isinstance(res, tuple) else img
     return av.VideoFrame.from_ndarray(processed_img, format="bgr24")
 
-# --- UI Tabs ---
-tab_home, tab_live, tab_upload = st.tabs(["🏠 Info", "🎥 Live Camera", "📤 Upload Image"])
+# --- Tabs Structure ---
+tab_info, tab_live, tab_upload = st.tabs(["🏠 Info", "🎥 Live Camera", "📤 Upload Image"])
 
-with tab_home:
+with tab_info:
     st.markdown('<div class="info-card">', unsafe_allow_html=True)
     col1, col2 = st.columns([1, 2])
     with col1:
         st.image("https://cdn-icons-png.flaticon.com/512/2103/2103633.png", width=120)
     with col2:
-        st.subheader("Pritam's Professional Emotion AI")
-        st.write("CNN-based real-time facial analysis system.")
+        st.subheader("Pritam Kumar | Emotion AI")
+        st.write("Professional Real-Time Expression Analysis System.")
+    
     st.markdown("---")
-    st.write("**Contact for Feedback:**")
+    st.subheader("Connect & Feedback")
     c1, c2, c3 = st.columns(3)
     c1.markdown("[🔗 LinkedIn](https://www.linkedin.com/in/pritam-kumar-607631334)")
     c2.markdown("[📸 Instagram](https://www.instagram.com/pritamray26)")
@@ -126,9 +122,8 @@ with tab_home:
     st.markdown('</div>', unsafe_allow_html=True)
 
 with tab_live:
-    st.info("Ensure you have good lighting for best accuracy.")
     webrtc_streamer(
-        key="emotion-ultimate",
+        key="emotion-live-fast",
         mode=WebRtcMode.SENDRECV,
         rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
         video_frame_callback=callback,
@@ -137,22 +132,22 @@ with tab_live:
     )
 
 with tab_upload:
-    file = st.file_uploader("Upload Image", type=['jpg', 'png', 'jpeg'])
+    file = st.file_uploader("Upload Image (Optimized for speed)", type=['jpg', 'png', 'jpeg'])
     if file:
         file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
         img = cv2.imdecode(file_bytes, 1)
         
-        with st.spinner('Analyzing Expressions...'):
+        with st.spinner('Processing Deep Analysis...'):
             result = process_emotion(img)
             
             if result == "limit":
-                st.error("Too many faces detected! Please use an image with fewer than 12 people.")
+                st.error("Detected >12 faces. Please use a smaller group photo for analysis.")
             else:
                 processed_img, count = result
                 st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_column_width=True)
-                st.success(f"Detected {count} face(s) with high confidence.")
+                st.success(f"Analysis complete! Detected {count} face(s).")
                 
                 # Download Result
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                 _, enc = cv2.imencode('.jpg', processed_img)
-                st.download_button("📥 Download Result", data=enc.tobytes(), file_name=f"emotion_{ts}.jpg")
+                st.download_button("📥 Save Analysis", data=enc.tobytes(), file_name=f"emotion_{ts}.jpg")
