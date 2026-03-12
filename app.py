@@ -49,28 +49,28 @@ model, face_cascade = setup_resources()
 emotion_labels = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
 color_map = {0: (0, 0, 255), 1: (0, 255, 0), 2: (255, 255, 255), 3: (255, 0, 0), 4: (0, 255, 255)}
 
-# --- Speed-Optimized Logic ---
+# --- Universal Detection Logic ---
 def process_emotion(image):
-    # STEP 1: Strict Resize for Speed (Prevents analysis freeze)
     h, w = image.shape[:2]
-    max_side = 800 # Optimized for Streamlit Cloud
+    max_side = 900 # Slightly increased for better group detail
     if max(h, w) > max_side:
         scale = max_side / max(h, w)
         image = cv2.resize(image, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
         h, w = image.shape[:2]
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # Histogram Equalization specifically for distance/low-light faces
     gray = cv2.equalizeHist(gray)
     
-    # STEP 2: Faster Face Detection
+    # --- FIX: ScaleFactor 1.05 and minSize 20x20 for distance and close-up faces ---
     faces = face_cascade.detectMultiScale(
         gray, 
-        scaleFactor=1.2, # Scans fewer windows for faster results
-        minNeighbors=5, 
-        minSize=(50, 50)
+        scaleFactor=1.05, 
+        minNeighbors=4, 
+        minSize=(20, 20)
     )
     
-    if len(faces) > 12:
+    if len(faces) > 15: # Increased limit for larger groups
         return "limit", len(faces)
     
     for (x, y, fw, fh) in faces:
@@ -78,15 +78,13 @@ def process_emotion(image):
         roi_gray = cv2.resize(roi_gray, (48, 48)) / 255.0
         roi_gray = np.reshape(roi_gray, (1, 48, 48, 1))
         
-        # Fast Inference
         prediction = model.predict(roi_gray, verbose=0)
         idx = np.argmax(prediction)
         label = emotion_labels[idx]
         color = color_map[idx]
         
-        # Scaling labels
-        thickness = max(2, int(w / 450))
-        font_scale = max(0.5, w / 900)
+        thickness = max(2, int(w / 500))
+        font_scale = max(0.4, w / 1000)
         
         text_y = y - 10 if y - 10 > 25 else y + fh + 30
         cv2.putText(image, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, (0, 0, 0), thickness + 2)
@@ -132,22 +130,21 @@ with tab_live:
     )
 
 with tab_upload:
-    file = st.file_uploader("Upload Image (Optimized for speed)", type=['jpg', 'png', 'jpeg'])
+    file = st.file_uploader("Upload Image (Optimized for Distance & Groups)", type=['jpg', 'png', 'jpeg'])
     if file:
         file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
         img = cv2.imdecode(file_bytes, 1)
         
-        with st.spinner('Processing Deep Analysis...'):
+        with st.spinner('Scanning all faces...'):
             result = process_emotion(img)
             
             if result == "limit":
-                st.error("Detected >12 faces. Please use a smaller group photo for analysis.")
+                st.error("Detected >15 faces. Please use a smaller group photo.")
             else:
                 processed_img, count = result
                 st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_column_width=True)
-                st.success(f"Analysis complete! Detected {count} face(s).")
+                st.success(f"Detection complete! Found {count} face(s).")
                 
-                # Download Result
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                 _, enc = cv2.imencode('.jpg', processed_img)
                 st.download_button("📥 Save Analysis", data=enc.tobytes(), file_name=f"emotion_{ts}.jpg")
