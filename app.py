@@ -51,53 +51,59 @@ color_map = {0: (0, 0, 255), 1: (0, 255, 0), 2: (255, 255, 255), 3: (255, 0, 0),
 
 # --- Preprocessing & Detection Engine ---
 def process_emotion(image):
-    h, w = image.shape[:2]
-    max_side = 900 
-    if max(h, w) > max_side:
-        scale = max_side / max(h, w)
-        image = cv2.resize(image, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+    # CRASH PROTECTION BLOCK
+    try:
         h, w = image.shape[:2]
+        max_side = 900 
+        if max(h, w) > max_side:
+            scale = max_side / max(h, w)
+            image = cv2.resize(image, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+            h, w = image.shape[:2]
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-    gray_enhanced = clahe.apply(gray)
-    
-    faces = face_cascade.detectMultiScale(
-        gray_enhanced, 
-        scaleFactor=1.1, 
-        minNeighbors=6, 
-        minSize=(30, 30)
-    )
-    
-    if len(faces) > 15:
-        return "limit", len(faces)
-    
-    for (x, y, fw, fh) in faces:
-        roi_gray = gray_enhanced[y:y+fh, x:x+fw]
-        roi_gray = cv2.resize(roi_gray, (48, 48))
-        roi_gray = cv2.GaussianBlur(roi_gray, (3, 3), 0)
-        roi_gray = roi_gray.astype("float32") / 255.0
-        roi_gray = np.reshape(roi_gray, (1, 48, 48, 1))
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        gray_enhanced = clahe.apply(gray)
         
-        prediction = model.predict(roi_gray, verbose=0)
-        idx = np.argmax(prediction)
-        label = emotion_labels[idx]
-        color = color_map[idx]
+        # Stability fix: Robust parameters to prevent OpenCV buffer errors
+        faces = face_cascade.detectMultiScale(
+            gray_enhanced, 
+            scaleFactor=1.1, 
+            minNeighbors=6, 
+            minSize=(30, 30)
+        )
         
-        thickness = max(2, int(w / 500))
-        font_scale = max(0.45, w / 1000)
+        if len(faces) > 15:
+            return "limit", len(faces)
         
-        text_y = y - 10 if y - 10 > 25 else y + fh + 30
-        cv2.putText(image, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, (0, 0, 0), thickness + 2)
-        cv2.putText(image, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, color, thickness)
-        cv2.rectangle(image, (x, y), (x+fw, y+fh), color, thickness)
-        
-    return image, len(faces)
+        for (x, y, fw, fh) in faces:
+            roi_gray = gray_enhanced[y:y+fh, x:x+fw]
+            roi_gray = cv2.resize(roi_gray, (48, 48))
+            roi_gray = cv2.GaussianBlur(roi_gray, (3, 3), 0)
+            roi_gray = roi_gray.astype("float32") / 255.0
+            roi_gray = np.reshape(roi_gray, (1, 48, 48, 1))
+            
+            prediction = model.predict(roi_gray, verbose=0)
+            idx = np.argmax(prediction)
+            label = emotion_labels[idx]
+            color = color_map[idx]
+            
+            thickness = max(2, int(w / 500))
+            font_scale = max(0.45, w / 1000)
+            
+            text_y = y - 10 if y - 10 > 25 else y + fh + 30
+            cv2.putText(image, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, (0, 0, 0), thickness + 2)
+            cv2.putText(image, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, color, thickness)
+            cv2.rectangle(image, (x, y), (x+fw, y+fh), color, thickness)
+            
+        return image, len(faces)
+    except Exception:
+        return "error", 0
 
 def callback(frame):
     img = frame.to_ndarray(format="bgr24")
     res = process_emotion(img)
-    processed_img = res[0] if isinstance(res, tuple) else img
+    # If error or limit occurs, show original frame to keep stream alive
+    processed_img = res[0] if isinstance(res, tuple) and not isinstance(res[0], str) else img
     return av.VideoFrame.from_ndarray(processed_img, format="bgr24")
 
 # --- UI Structure ---
@@ -151,8 +157,10 @@ with tab_upload:
         with st.spinner('Applying Deep Preprocessing & Analysis...'):
             result = process_emotion(img)
             
-            if result == "limit":
+            if result[0] == "limit":
                 st.error("Too many faces! Please upload an image with up to 15 members.")
+            elif result[0] == "error":
+                st.warning("⚠️ Image quality or format issue. Please try another photo with better lighting.")
             else:
                 processed_img, count = result
                 st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_column_width=True)
