@@ -65,13 +65,19 @@
 
 <hr>
 
-<h2 id="key-features">🧠 Key Engineering Features</h2>
+<hr>
+
+<h2 id="technical-details">🧠 Technical Implementation</h2>
 <ul>
-  <li><b>Adaptive Rescaling:</b> Automatically handles high-resolution images to prevent OpenCV memory crashes (Fixed <code>scaleIdx</code> assertion errors).</li>
-  <li><b>Contrast Enhancement (CLAHE):</b> Integrated Contrast Limited Adaptive Histogram Equalization for accurate detection in low-light and complex group settings.</li>
-  <li><b>Temporal Stability:</b> Optimized for low-latency inference via Streamlit-WebRTC.</li>
-  <li><b>Multi-Face Support:</b> Fine-tuned to detect up to 15 faces in a single frame.</li>
+  <li><b>Model Architecture:</b> The system utilizes a custom <b>Convolutional Neural Network (CNN)</b> stored in <code>emotion_detection.h5</code>. The model was trained to classify facial expressions into 5 distinct categories using deep feature extraction layers.</li>
+  <li><b>Facial Localization:</b> Object detection is handled via <code>haarcascade_frontalface_default.xml</code>. This Haar-Cascade classifier identifies the Region of Interest (ROI) within a frame before passing it to the neural network.</li>
+  <li><b>Input Pipeline:</b> Raw image data undergoes a multi-stage preprocessing sequence: Grayscale conversion, <b>CLAHE</b> (Contrast Limited Adaptive Histogram Equalization) for feature enhancement, and 48x48 pixel resizing to match the model's input tensor.</li>
+  <li><b>Inference Engine:</b> Real-time video processing is powered by <b>WebRTC</b>, enabling high-frequency frame analysis and low-latency feedback between the browser and the Python backend.</li>
+  <li><b>Backend Stack:</b> The core logic is built with <b>TensorFlow</b> for model inference and <b>OpenCV</b> for computer vision operations, all integrated into a <b>Streamlit</b> interface.</li>
 </ul>
+
+<hr>
+
 
 <hr>
 
