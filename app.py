@@ -51,58 +51,53 @@ color_map = {0: (0, 0, 255), 1: (0, 255, 0), 2: (255, 255, 255), 3: (255, 0, 0),
 
 # --- Preprocessing & Detection Engine ---
 def process_emotion(image):
-    # CRASH PROTECTION BLOCK
-    try:
+    h, w = image.shape[:2]
+    max_side = 900 
+    if max(h, w) > max_side:
+        scale = max_side / max(h, w)
+        image = cv2.resize(image, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
         h, w = image.shape[:2]
-        max_side = 900 
-        if max(h, w) > max_side:
-            scale = max_side / max(h, w)
-            image = cv2.resize(image, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
-            h, w = image.shape[:2]
 
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-        gray_enhanced = clahe.apply(gray)
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    gray_enhanced = clahe.apply(gray)
+    
+    # Standard detection without over-sensitive error catching
+    faces = face_cascade.detectMultiScale(
+        gray_enhanced, 
+        scaleFactor=1.1, 
+        minNeighbors=6, 
+        minSize=(30, 30)
+    )
+    
+    if len(faces) > 15:
+        return "limit", len(faces)
+    
+    for (x, y, fw, fh) in faces:
+        roi_gray = gray_enhanced[y:y+fh, x:x+fw]
+        roi_gray = cv2.resize(roi_gray, (48, 48))
+        roi_gray = cv2.GaussianBlur(roi_gray, (3, 3), 0)
+        roi_gray = roi_gray.astype("float32") / 255.0
+        roi_gray = np.reshape(roi_gray, (1, 48, 48, 1))
         
-        # Stability fix: Robust parameters to prevent OpenCV buffer errors
-        faces = face_cascade.detectMultiScale(
-            gray_enhanced, 
-            scaleFactor=1.1, 
-            minNeighbors=6, 
-            minSize=(30, 30)
-        )
+        prediction = model.predict(roi_gray, verbose=0)
+        idx = np.argmax(prediction)
+        label = emotion_labels[idx]
+        color = color_map[idx]
         
-        if len(faces) > 15:
-            return "limit", len(faces)
+        thickness = max(2, int(w / 500))
+        font_scale = max(0.45, w / 1000)
         
-        for (x, y, fw, fh) in faces:
-            roi_gray = gray_enhanced[y:y+fh, x:x+fw]
-            roi_gray = cv2.resize(roi_gray, (48, 48))
-            roi_gray = cv2.GaussianBlur(roi_gray, (3, 3), 0)
-            roi_gray = roi_gray.astype("float32") / 255.0
-            roi_gray = np.reshape(roi_gray, (1, 48, 48, 1))
-            
-            prediction = model.predict(roi_gray, verbose=0)
-            idx = np.argmax(prediction)
-            label = emotion_labels[idx]
-            color = color_map[idx]
-            
-            thickness = max(2, int(w / 500))
-            font_scale = max(0.45, w / 1000)
-            
-            text_y = y - 10 if y - 10 > 25 else y + fh + 30
-            cv2.putText(image, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, (0, 0, 0), thickness + 2)
-            cv2.putText(image, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, color, thickness)
-            cv2.rectangle(image, (x, y), (x+fw, y+fh), color, thickness)
-            
-        return image, len(faces)
-    except Exception:
-        return "error", 0
+        text_y = y - 10 if y - 10 > 25 else y + fh + 30
+        cv2.putText(image, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, (0, 0, 0), thickness + 2)
+        cv2.putText(image, label, (x, text_y), cv2.FONT_HERSHEY_DUPLEX, font_scale, color, thickness)
+        cv2.rectangle(image, (x, y), (x+fw, y+fh), color, thickness)
+        
+    return image, len(faces)
 
 def callback(frame):
     img = frame.to_ndarray(format="bgr24")
     res = process_emotion(img)
-    # If error or limit occurs, show original frame to keep stream alive
     processed_img = res[0] if isinstance(res, tuple) and not isinstance(res[0], str) else img
     return av.VideoFrame.from_ndarray(processed_img, format="bgr24")
 
@@ -121,15 +116,15 @@ with tab_info:
     st.markdown("---")
     st.subheader("System Overview")
     st.markdown("""
-    - **Architecture:** Convolutional Neural Network (CNN) optimized for FER2013.
-    - **Face Tracking:** Robust Haar-Cascade multi-face detection (optimized for groups).
+    - **Architecture:** Convolutional Neural Network (CNN).
+    - **Face Tracking:** Robust Haar-Cascade multi-face detection.
     - **Image Processing:** CLAHE contrast enhancement and Gaussian noise reduction.
     - **Stability:** Dynamic rescaling for high-resolution input handling.
     """)
     
     st.markdown("---")
     st.subheader("📬 Feedback & Contact")
-    st.info("I am constantly working to improve this model's accuracy. If you notice any incorrect detections, please share the result with me via the links below. Your feedback is invaluable!")
+    st.info("Your feedback helps improve accuracy! Connect with me via the links below.")
     
     c1, c2, c3 = st.columns(3)
     c1.markdown("[🔗 LinkedIn](https://www.linkedin.com/in/pritam-kumar-607631334)")
@@ -138,9 +133,9 @@ with tab_info:
     st.markdown('</div>', unsafe_allow_html=True)
 
 with tab_live:
-    st.info("Directly accessing front camera. Best used in well-lit conditions.")
+    st.info("Directly accessing front camera. Supported up to 15 faces.")
     webrtc_streamer(
-        key="emotion-live-accurate",
+        key="emotion-live-final",
         mode=WebRtcMode.SENDRECV,
         rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
         video_frame_callback=callback,
@@ -154,13 +149,11 @@ with tab_upload:
         file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
         img = cv2.imdecode(file_bytes, 1)
         
-        with st.spinner('Applying Deep Preprocessing & Analysis...'):
+        with st.spinner('Applying Deep Analysis...'):
             result = process_emotion(img)
             
             if result[0] == "limit":
                 st.error("Too many faces! Please upload an image with up to 15 members.")
-            elif result[0] == "error":
-                st.warning("⚠️ Image quality or format issue. Please try another photo with better lighting.")
             else:
                 processed_img, count = result
                 st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_column_width=True)
