@@ -157,7 +157,7 @@ with tab_upload:
                 processed_img, count = result
                 st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_column_width=True)
                 st.success(f"Analysis complete! Detected {count} face(s).")
-                
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                 _, enc = cv2.imencode('.jpg', processed_img)
                 st.download_button("📥 Save Analysis", data=enc.tobytes(), file_name=f"emotion_{ts}.jpg")
+
